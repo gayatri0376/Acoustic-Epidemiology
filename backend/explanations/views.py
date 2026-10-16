@@ -5,6 +5,8 @@ from django.shortcuts import get_object_or_404
 from ml_inference.models import Prediction
 from explanations.models import Explanation, ExplanationMethod, ExplanationStatus
 from explanations.serializers import ExplanationSerializer
+from explanations.services import GradCamService
+
 
 
 class PredictionExplanationListCreateView(APIView):
@@ -58,41 +60,24 @@ class PredictionExplanationListCreateView(APIView):
 
         method = request.data.get('method', ExplanationMethod.GRAD_CAM)
 
-        # Verify if a real trained model is available to generate actual gradients
-        model_version = prediction.model_version
-        if not model_version or not model_version.is_artifact_available():
-            explanation = Explanation.objects.create(
-                prediction=prediction,
-                method=method,
-                status=ExplanationStatus.UNSUPPORTED,
-                error_details=(
-                    "Explanation unavailable: No active, trained CNN model artifact with convolutional layers "
-                    "is deployed to compute gradient-weighted class activations. Saliency maps are never fabricated."
-                )
-            )
+        result = GradCamService.generate_explanation(prediction, method=method)
+        if not result.get("success"):
+            explanation = result["explanation"]
             return Response(
                 {
                     "error": "Explanation Generation Unsupported",
-                    "code": "GRADIENT_MODEL_UNAVAILABLE",
+                    "code": result.get("code", "GRADIENT_MODEL_UNAVAILABLE"),
                     "explanation_id": str(explanation.id),
                     "prediction_id": str(prediction.id),
-                    "message": (
-                        "Grad-CAM requires access to the trained convolutional layers and weights of the CNN model. "
-                        "Because no model artifact is currently deployed, authentic saliency maps cannot be computed."
-                    )
+                    "message": result.get("message", "Authentic saliency maps cannot be computed.")
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
 
-        # If a real model is deployed, generate real Grad-CAM
-        # (TensorFlow gradient tape implementation placeholder for when real weights are mounted)
-        explanation = Explanation.objects.create(
-            prediction=prediction,
-            method=method,
-            status=ExplanationStatus.PENDING
-        )
+        explanation = result["explanation"]
         serializer = ExplanationSerializer(explanation)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
 
 
 class ExplanationDetailView(APIView):

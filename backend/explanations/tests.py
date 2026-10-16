@@ -52,3 +52,21 @@ class ExplanationsApiTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['status'], ExplanationStatus.UNSUPPORTED)
+
+    def test_find_last_conv_layer_detection(self):
+        from explanations.services import GradCamService
+        
+        # Test with dummy object lacking layers
+        self.assertIsNone(GradCamService.find_last_conv_layer(None))
+        self.assertIsNone(GradCamService.find_last_conv_layer(object()))
+
+        class Conv2D:
+            name = 'conv2d_final'
+        class Dense:
+            name = 'dense_output'
+        class MockModel:
+            layers = [Conv2D(), Dense()]
+
+        self.assertEqual(GradCamService.find_last_conv_layer(MockModel()), 'conv2d_final')
+
+

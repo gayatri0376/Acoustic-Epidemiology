@@ -81,3 +81,57 @@ class MLInferenceTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['prediction_status'], PredictionStatus.UNAVAILABLE)
+
+    def test_validate_model_output_dimension_mismatch(self):
+        from ml_inference.services import InferenceService
+        # 3 output probabilities provided, but verified_classes has 4 classes
+        raw_output = [[0.7, 0.2, 0.1]]
+        classes = ['Normal', 'Wheeze', 'Crackle', 'Stridor']
+        with self.assertRaises(ValueError) as ctx:
+            InferenceService.validate_model_output(raw_output, classes)
+        self.assertIn("does not match verified class label count", str(ctx.exception))
+
+    def test_validate_model_output_nan_inf(self):
+        from ml_inference.services import InferenceService
+        raw_output = [[float('nan'), 0.5]]
+        classes = ['Normal', 'Wheeze']
+        with self.assertRaises(ValueError) as ctx:
+            InferenceService.validate_model_output(raw_output, classes)
+        self.assertIn("contains NaN or infinite values", str(ctx.exception))
+
+    def test_model_version_active_requires_verified_classes(self):
+        # Even with artifact path, clean() must require non-empty verified_classes
+        model = ModelVersion(
+            version='pediatric-cnn-no-classes',
+            status=ModelStatus.ACTIVE,
+            artifact_path='ml/models/dummy.keras',
+            verified_classes=[]
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            model.clean()
+        self.assertTrue('status' in ctx.exception.message_dict or 'verified_classes' in ctx.exception.message_dict)
+
+    def test_audio_preprocessor_synthetic_signal(self):
+        import numpy as np
+        from ml_inference.services import AudioPreprocessor
+        # Generate 1-second 16kHz sine wave
+        t = np.linspace(0, 1.0, 16000, endpoint=False)
+        audio = 0.5 * np.sin(2 * np.pi * 440 * t).astype(np.float32)
+
+        mel_spec = AudioPreprocessor.compute_mel_spectrogram(
+            audio=audio,
+            sr=16000,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512
+        )
+        self.assertEqual(mel_spec.shape[0], 128)
+        self.assertTrue(mel_spec.shape[1] > 0)
+        self.assertFalse(np.isnan(mel_spec).any())
+
+    def test_model_cache_clear(self):
+        from ml_inference.services import ModelCache
+        ModelCache.clear()
+        self.assertIsNone(ModelCache._cached_model)
+        self.assertIsNone(ModelCache._cached_version_id)
+

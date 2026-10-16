@@ -11,3 +11,5 @@ python-dotenv==1.2.4
 soundfile==0.14.0
 sqlparse==0.6.0
 typing-extensions==4.16.0
+librosa==1.0.0
+scipy==1.18.1
