@@ -1,17 +1,47 @@
-cat > .gitignore <<'EOF'
+# Operating System
 .DS_Store
+Thumbs.db
+
+# Environment variables
 .env
+.env.local
+.env.*.local
+!.env.example
+
+# Python & Virtual Environments
 .venv/
 venv/
+ENV/
+env/
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+
+# Django
 db.sqlite3
+db.sqlite3-journal
 media/
+staticfiles/
+
+# Frontend / Node
 node_modules/
 dist/
+dist-ssr/
 build/
+*.local
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter
 .ipynb_checkpoints/
+
+# Research Outputs & Large Dataset/Models
 outputs/
 ml/dataset/*
+!ml/dataset/.gitkeep
 ml/models/saved_models/
-EOF
