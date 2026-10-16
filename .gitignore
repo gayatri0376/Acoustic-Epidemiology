@@ -1,0 +1,17 @@
+cat > .gitignore <<'EOF'
+.DS_Store
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+db.sqlite3
+media/
+node_modules/
+dist/
+build/
+.ipynb_checkpoints/
+outputs/
+ml/dataset/*
+ml/models/saved_models/
+EOF
