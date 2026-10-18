@@ -181,12 +181,59 @@ export async function fetchRecordings(token) {
 
 /**
  * Requests ML inference for a recording
+ * Handles HTTP 503 (Model Unavailable), HTTP 400 (Invalid Audio), and HTTP 500 cleanly.
  */
 export async function requestPrediction(recordingId, token) {
   const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/recordings/${recordingId}/predict/`;
   try {
     const response = await fetch(url, {
       method: 'POST',
+      headers: getAuthHeaders(token),
+    });
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      statusCode: response.status,
+      isModelUnavailable: response.status === 503,
+      isInvalidAudio: response.status === 400,
+      errorMessage: response.ok ? null : (data.error || data.detail || data.message || 'Inference request failed'),
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      isNetworkError: true,
+      errorMessage: `Network error connecting to inference endpoint: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Retrieves a single prediction by ID
+ */
+export async function fetchPrediction(predictionId, token) {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/predictions/${predictionId}/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(token),
+    });
+    const data = await response.json();
+    return { success: response.ok, data, statusCode: response.status };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Retrieves all prediction records for a specific recording
+ */
+export async function fetchRecordingPredictions(recordingId, token) {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/recordings/${recordingId}/predictions/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
       headers: getAuthHeaders(token),
     });
     const data = await response.json();
@@ -198,6 +245,7 @@ export async function requestPrediction(recordingId, token) {
 
 /**
  * Requests Grad-CAM explanation for a prediction
+ * Handles HTTP 503 (Unsupported / Weights missing) cleanly without crashing.
  */
 export async function requestExplanation(predictionId, token, method = 'GRAD_CAM') {
   const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/predictions/${predictionId}/explanations/`;
@@ -206,6 +254,90 @@ export async function requestExplanation(predictionId, token, method = 'GRAD_CAM
       method: 'POST',
       headers: getAuthHeaders(token),
       body: JSON.stringify({ method }),
+    });
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      statusCode: response.status,
+      isUnsupported: response.status === 503,
+      errorMessage: response.ok ? null : (data.error || data.message || data.detail || 'Explanation request failed'),
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      isNetworkError: true,
+      errorMessage: `Network error requesting explanation: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Retrieves all generated explanations for a prediction
+ */
+export async function fetchPredictionExplanations(predictionId, token) {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/predictions/${predictionId}/explanations/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(token),
+    });
+    const data = await response.json();
+    return { success: response.ok, data, statusCode: response.status };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Retrieves explanation details and artifact URL by ID
+ */
+export async function fetchExplanation(explanationId, token) {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/explanations/${explanationId}/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getAuthHeaders(token),
+    });
+    const data = await response.json();
+    return { success: response.ok, data, statusCode: response.status };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetches the currently active model from the registry
+ */
+export async function fetchActiveModel() {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/models/active/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      statusCode: response.status,
+      isModelDeployed: response.ok,
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetches all registered models from the registry
+ */
+export async function fetchModels() {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/models/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
     });
     const data = await response.json();
     return { success: response.ok, data, statusCode: response.status };
@@ -233,3 +365,4 @@ export async function submitAssessment(predictionId, assessmentData, token) {
 }
 
 export { API_BASE_URL };
+

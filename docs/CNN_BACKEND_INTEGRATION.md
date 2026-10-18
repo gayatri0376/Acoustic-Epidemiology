@@ -134,40 +134,55 @@ Predicted Class: "Wheeze" (Argmax)
 
 ## 6. Model Version Registration and Activation
 
-Models are registered in the MySQL `model_versions` table via Django Admin or programmatic scripts:
+Models are registered in the MySQL `model_versions` table using the automated management command `python manage.py register_model` or programmatically via Django Admin / shell.
 
-```python
-from ml_inference.models import ModelVersion, ModelStatus
+### Automated Registration Utility (`register_model`)
 
-model_v1 = ModelVersion(
-    version="pediatric-cnn-v1.0.0",
-    architecture="2D-CNN-Spectrogram",
-    artifact_path="ml/models/saved_models/pediatric_cnn.keras",
-    verified_classes=["Normal", "Wheeze", "Crackle"],
-    preprocessing_config={
-        "sample_rate": 16000,
-        "n_mels": 128,
-        "n_fft": 1024,
-        "hop_length": 512,
-        "f_min": 50.0,
-        "f_max": 2000.0,
-        "to_db": True
-    },
-    status=ModelStatus.ACTIVE,
-    evaluation_metadata={
-        "validation_accuracy": 0.892,
-        "val_loss": 0.281,
-        "training_epochs": 50,
-        "dataset": "Pediatric Respiratory Sound Database"
-    }
-)
-model_v1.full_clean()  # Validates that artifact physically exists on disk
-model_v1.save()
+The backend provides a safe, fail-fast CLI command that validates file presence, storage hierarchy conventions, TensorFlow topology, neuron counts, and output activations before persisting to MySQL:
+
+```bash
+python manage.py register_model \
+    --model-version "pediatric-cnn-v1.0.0" \
+    --artifact-path "ml/models/saved_models/pediatric_cnn.keras" \
+    --classes Normal Wheeze Crackle \
+    --architecture "2D-CNN-Spectrogram" \
+    --status ACTIVE \
+    --sample-rate 16000 \
+    --n-mels 128 \
+    --n-fft 1024 \
+    --hop-length 512 \
+    --f-min 50.0 \
+    --f-max 2000.0 \
+    --target-conv-layer "conv2d_final" \
+    --evaluation-metadata '{"validation_accuracy": 0.892, "val_loss": 0.281}' \
+    --deactivate-others
 ```
 
-### Automatic Validation Guards in `ModelVersion.clean()`:
-1. Cannot set `status='ACTIVE'` if `artifact_path` does not exist on disk.
-2. Cannot set `status='ACTIVE'` if `verified_classes` list is empty.
+#### Command Options & Parameters:
+- `--model-version`: Unique string identifier for the model version (required).
+- `--artifact-path`: Path to trained weights file relative to project root (`ml/models/...`) (required).
+- `--classes`: Ordered list of class labels corresponding to output neurons 0, 1, 2... (required).
+- `--architecture`: Neural network descriptor (default: `2D-CNN-Spectrogram`).
+- `--status`: Model status: `DEVELOPMENT`, `ACTIVE`, or `RETIRED` (default: `DEVELOPMENT`).
+- `--sample-rate`, `--n-mels`, `--n-fft`, `--hop-length`, `--f-min`, `--f-max`: Acoustic feature extraction parameters.
+- `--preprocessing-config`: Optional path to a JSON configuration file or JSON string overriding individual acoustic flags.
+- `--target-conv-layer`: Final 2D convolutional layer name for Grad-CAM explainability (validated against model topology).
+- `--evaluation-metadata`: JSON string or file path containing genuine test metrics. Never fabricated.
+- `--replace`: Allows updating an existing version record.
+- `--deactivate-others`: Retires any currently ACTIVE models when marking this model ACTIVE.
+- `--dry-run`: Runs all topology, dimension, and schema validations without committing changes to MySQL.
+
+#### Prerequisites:
+1. **Model Weights:** The `.keras`, `.h5`, or SavedModel directory must physically exist inside `ml/models/`.
+2. **Deep Learning Runtime:** TensorFlow/Keras must be installed in the active Python environment. If missing, the command fails gracefully with `ML Runtime Dependency Error`.
+3. **Class Matching:** The number of classes passed via `--classes` must match the model's output neurons (`output_shape[-1]`) exactly.
+
+### Automatic Validation Guards:
+1. Path traversal is blocked; artifacts must reside within `ml/models/`.
+2. Missing files are rejected before registration.
+3. Output dimension mismatches raise immediate errors.
+4. Cannot set `status='ACTIVE'` if `artifact_path` does not exist on disk or `verified_classes` is empty.
+5. Softmax vs. logits output activation is detected from the final layer and recorded.
 
 ---
 
