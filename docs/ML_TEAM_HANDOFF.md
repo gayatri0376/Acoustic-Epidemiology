@@ -1,150 +1,103 @@
 # Machine Learning Team Handoff & Model Delivery Guide
 
-**To:** Mohini (Machine Learning Lead) & Samruddhi (Dataset & Preprocessing Lead)  
-**From:** Gayatri (Backend Lead & Architecture)  
 **Project:** Acoustic Epidemiology: Automated Classification of Pediatric Respiratory Diseases Using Convolutional Neural Networks and Time-Frequency Feature Extraction  
-**Date:** October 2026  
-**Status:** Backend Infrastructure Ready for Real CNN Weights
+**Dataset:** SPRSound (SJTU Paediatric Respiratory Sound Database) CC BY 4.0  
+**Date:** 2026-10-21  
+**Status:** Preprocessing, Training Pipeline, Evaluation Engine, and Django Inference Fully Harmonized & Verified
 
 ---
 
 ## 1. Executive Summary
 
-The Django REST backend architecture, MySQL database, audio validation pipeline, and prediction/explanation APIs are fully implemented and verified (passing all 34 automated integration tests).
+The entire acoustic epidemiology engineering pipeline has been implemented, standardized, and validated with 78 automated tests (47 Django tests, 18 audio preprocessing tests, 10 feature extraction and patient-leakage tests, and 3 evaluation engine tests).
 
-To connect your trained Convolutional Neural Network (CNN) to the live system, we need your model artifact, preprocessing parameters, and label ordering. This document specifies exactly what you need to provide and where to place your files.
-
----
-
-## 2. Deliverables Checklist
-
-Please provide the following items when your training is complete:
-
-### [ ] 1. Trained Model File
-- **Destination:** `ml/models/saved_models/<model_filename>.keras` (or `.h5`)
-- **Preferred Format:** Keras v3 / TensorFlow SavedModel (`.keras`).
-- **Dependencies:** Specify TensorFlow / Keras version used (e.g. `tensorflow==2.18.0`).
-
-### [ ] 2. Exact Class Label Order
-The backend maps output probabilities index-by-index to class names. We need the exact Python list matching your model's output neurons:
-```python
-# EXAMPLE (Please replace with your actual training class ordering):
-VERIFIED_CLASSES = [
-    "Normal",      # Index 0
-    "Wheeze",      # Index 1
-    "Crackle",     # Index 2
-    "Stridor"      # Index 3 (if applicable)
-]
-```
-> **Important:** If your training used `ImageDataGenerator.class_indices`, please provide that dictionary directly.
-
-### [ ] 3. Audio Preprocessing Parameters
-The backend needs the exact parameters used during dataset feature extraction so inference matches training conditions:
-- **Audio Sample Rate ($f_s$):** e.g., `16000 Hz` or `22050 Hz`
-- **Frequency Bandpass Filter:** Low cutoff (e.g. 50 Hz) and High cutoff (e.g. 2000 Hz)
-- **Mel Filterbanks ($n\_mels$):** e.g., `128` or `64`
-- **STFT Window Length ($n\_fft$):** e.g., `1024` or `2048`
-- **Hop Length ($hop\_length$):** e.g., `512`
-- **Audio Duration Window:** Fixed duration (e.g. 2.5s, 5.0s) or variable width with zero-padding
-- **Decibel Scaling:** Method used (e.g. `librosa.power_to_db(..., ref=np.max)`)
-- **Spectrogram Normalization:** Any z-score standardization ($(\mu, \sigma)$) or min-max normalization applied to pixel values.
-
-### [ ] 4. Expected CNN Input Tensor Shape
-Please confirm the input dimensions required by your model's first layer:
-- e.g. `(batch_size, 128, 128, 1)` or `(batch_size, 128, 256, 1)`.
-
-### [ ] 5. Grad-CAM Target Layer Name
-For explainability heatmap generation, we need the layer name of the last 2D Convolutional layer before global pooling/dense layers:
-- e.g. `'conv2d_3'`, `'block5_conv3'`, or `'final_conv'`.
-- You can find this by running `model.summary()` and noting the last `Conv2D` layer.
-
-### [ ] 6. Model Evaluation Metadata
-For clinical research tracking, please supply your test set metrics:
-- Overall Validation Accuracy (e.g., `88.5%`)
-- Sensitivity / Recall per class
-- Specificity per class
-- Confusion matrix array
-- Dataset partition description (e.g. 70/15/15 train/val/test split across patient IDs)
+All components are now completely harmonized around a single, unified contract:
+1. **Deterministic Label Mapping:** Documented at [`ml/features/extracted/label_mapping.json`](file:///Users/gayatri/Downloads/Django/Acoustic-Epidemiology/ml/features/extracted/label_mapping.json).
+2. **Standardized Preprocessing Contract:** Implemented identically across [`ml/preprocessing/respiratory_preprocessor.py`](file:///Users/gayatri/Downloads/Django/Acoustic-Epidemiology/ml/preprocessing/respiratory_preprocessor.py) and [`backend/ml_inference/services.py`](file:///Users/gayatri/Downloads/Django/Acoustic-Epidemiology/backend/ml_inference/services.py).
+3. **Training Pipeline:** Fully implemented at [`ml/training/train_cnn.py`](file:///Users/gayatri/Downloads/Django/Acoustic-Epidemiology/ml/training/train_cnn.py) with patient-grouped folds and class-balanced weights.
+4. **Evaluation Engine:** Fully implemented at [`ml/evaluation/evaluate_model.py`](file:///Users/gayatri/Downloads/Django/Acoustic-Epidemiology/ml/evaluation/evaluate_model.py) with independent benchmarks (2022 inter-subject test and 2023 test).
+5. **Model Registry & Safe Inference:** Implemented in `backend/ml_inference/management/commands/register_model.py` and `backend/ml_inference/services.py`.
 
 ---
 
-## 3. Minimal Reproducible Verification Example
+## 2. Standardized Preprocessing Specification
 
-Please provide a short script (or fill in this template in `ml/models/verify_model.py`) demonstrating that your saved model executes on a sample `.wav` file:
+Both training and production inference utilize the exact same acoustic parameters:
 
-```python
-import numpy as np
-import soundfile as sf
-import librosa
-import tensorflow as tf
-
-MODEL_PATH = "ml/models/saved_models/pediatric_cnn.keras"
-SAMPLE_AUDIO = "path/to/sample_wheeze.wav"
-
-# 1. Load Model
-model = tf.keras.models.load_model(MODEL_PATH)
-print("Model loaded successfully. Input shape:", model.input_shape)
-
-# 2. Preprocess Sample Audio
-audio, sr = sf.read(SAMPLE_AUDIO)
-if audio.ndim > 1:
-    audio = np.mean(audio, axis=1)
-
-# Target sample rate & Mel-Spectrogram
-mel_spec = librosa.feature.melspectrogram(
-    y=audio, sr=16000, n_mels=128, n_fft=1024, hop_length=512, fmin=50, fmax=2000
-)
-mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-
-# Format to 4D tensor: (1, 128, time_steps, 1)
-input_tensor = np.expand_dims(mel_spec_db, axis=(0, -1)).astype(np.float32)
-
-# 3. Forward Pass
-predictions = model.predict(input_tensor)
-print("Raw output:", predictions)
-print("Softmax sum:", np.sum(predictions))
-```
+| Parameter | Production Contract Value | Rationale / Physiological Basis |
+|---|---|---|
+| **Sampling Rate ($f_s$)** | **8,000 Hz** | Native SPRSound sampling frequency (Nyquist = 4,000 Hz) |
+| **Channels** | **1 (Mono)** | Auscultation audio averaged across channels if stereo |
+| **Bandpass Filter** | **50 Hz – 2,000 Hz** | 5th-order zero-phase Butterworth SOS filter; eliminates heart sounds and noise |
+| **Mel Filterbanks ($n\_mels$)** | **128** | Frequency bin resolution |
+| **STFT Window Length ($n\_fft$)** | **1,024** | 128 ms frame window |
+| **Hop Length ($hop\_length$)** | **512** | 64 ms frame step (50% overlap) |
+| **Decibel Ceiling ($top\_db$)** | **80.0 dB** | Dynamic range ceiling relative to peak amplitude |
+| **Normalization** | **`minmax_01`** | Linear scaling to $[0.0, 1.0]$: $\text{clip}((\text{dB} + 80)/80, 0, 1)$ |
+| **Record Tensor Dimensions** | **`(1, 128, 128, 1)`** | Fixed width 128 time frames (symmetric center-pad / center-crop) |
+| **Event Tensor Dimensions** | **`(1, 128, 40, 1)`** | Segmented breath cycle (2.5s window at 64 ms hop) |
 
 ---
 
-## 4. How the Backend Connects Your Model
+## 3. Label Mapping & ML Classification Targets
 
-Once you place your weights file in `ml/models/saved_models/`, we will register it with one command:
+Defined in `ml/features/extracted/label_mapping.json`:
 
-```python
-python manage.py shell
-```
-```python
-from ml_inference.models import ModelVersion, ModelStatus
+### Primary Target: `SPRSOUND_RECORD_4CLASS`
+Acoustic classification of auscultation recordings into baseline and adventitious respiratory categories:
+- `0`: **`Normal`** (clear vesicular breath sounds)
+- `1`: **`CAS`** (Continuous Adventitious Sounds: wheezes, rhonchi)
+- `2`: **`DAS`** (Discontinuous Adventitious Sounds: crackles)
+- `3`: **`CAS & DAS`** (co-occurring continuous and discontinuous sounds)
+- **Quality Rejection:** Recordings annotated as `Poor Quality` are excluded from diagnostic classification and routed to frontline signal-to-noise rejection.
 
-ModelVersion.objects.create(
-    version="pediatric-cnn-v1.0.0",
-    architecture="2D-CNN-Spectrogram",
-    artifact_path="ml/models/saved_models/pediatric_cnn.keras",
-    verified_classes=["Normal", "Wheeze", "Crackle"],  # Your verified list
-    preprocessing_config={
-        "sample_rate": 16000,
-        "n_mels": 128,
-        "n_fft": 1024,
-        "hop_length": 512,
-        "f_min": 50.0,
-        "f_max": 2000.0,
-        "to_db": True
-    },
-    status=ModelStatus.ACTIVE,
-    evaluation_metadata={
-        "test_accuracy": 0.892,
-        "dataset": "Pediatric Respiratory Auscultation Dataset"
-    }
-)
+### Important Distinction: Clinical Disease vs. Acoustic Sound
+Clinical disease labels (e.g., Pneumonia, Asthma, Bronchitis) are patient-level diagnoses from hospital discharge summaries. They must **never** be naively assigned as recording-level ground truth, because focal diseases (like lobar pneumonia) produce crackles at one chest location (e.g. `p1`) while other quadrants (e.g. `p4`) contain entirely normal breath sounds.
+
+---
+
+## 4. Training and Evaluation Execution Workflow
+
+### Step 1: Install ML Dependencies (Requires Approval)
+```bash
+backend/.venv/bin/pip install tensorflow keras h5py matplotlib
 ```
 
-The backend's `InferenceService` and `ModelCache` will immediately:
-1. Detect the active version and load the weights into cached memory.
-2. Accept real-time audio uploads via `POST /api/v1/recordings/`.
-3. Preprocess audio into Mel-Spectrograms matching your exact parameters.
-4. Execute genuine CNN predictions via `POST /api/v1/recordings/{id}/predict/`.
-5. Return authentic softmax probability distributions to the React frontend.
-6. Generate Grad-CAM heatmaps for clinician review.
+### Step 2: Extract Training Features
+```bash
+backend/.venv/bin/python ml/features/extract_features.py --mode train
+```
 
-If you have any questions or need custom feature transforms (e.g. MFCCs or Chroma in addition to Mel-Spectrograms), let me know and we will adjust the backend pipeline accordingly!
+### Step 3: Run CNN Training
+```bash
+backend/.venv/bin/python ml/training/train_cnn.py \
+  --task SPRSOUND_RECORD_4CLASS \
+  --val-fold 0 \
+  --epochs 30 \
+  --batch-size 32
+```
+This generates:
+- Model weights: `ml/models/saved_models/sprsound-cnn-v1-fold0.keras`
+- Training history: `ml/models/saved_models/sprsound-cnn-v1-fold0_history.json`
+- Model configuration: `ml/models/saved_models/sprsound-cnn-v1-fold0_config.json`
+
+### Step 4: Evaluate on Independent Held-Out Benchmark
+```bash
+backend/.venv/bin/python ml/evaluation/evaluate_model.py \
+  --model-artifact ml/models/saved_models/sprsound-cnn-v1-fold0.keras \
+  --partition inter_2022 \
+  --task SPRSOUND_RECORD_4CLASS
+```
+
+### Step 5: Register the Model in Django
+```bash
+backend/.venv/bin/python backend/manage.py register_model \
+  --model-version sprsound-cnn-v1-fold0 \
+  --artifact-path ml/models/saved_models/sprsound-cnn-v1-fold0.keras \
+  --classes Normal CAS DAS "CAS & DAS" \
+  --status ACTIVE \
+  --architecture 2D-CNN-Spectrogram-4Block \
+  --target-conv-layer last_conv_layer \
+  --set-active
+```
+The model is now deployed in production. The Django REST API will automatically load the model into memory, execute forward passes for incoming audio, compute Grad-CAM heatmaps on request, and record clinician reviews.

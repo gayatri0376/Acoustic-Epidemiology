@@ -127,11 +127,28 @@ class AudioPreprocessor:
         hop_length=512, 
         f_min=50.0, 
         f_max=2000.0,
-        to_db=True
+        to_db=True,
+        apply_bandpass=False,
+        normalization=None
     ):
         """
         Generates 2D Mel-Spectrogram energy distribution from 1D temporal pressure wave.
+        Supports optional zero-phase Butterworth bandpass and min-max normalization.
         """
+        # Optional 5th-order Butterworth bandpass filter
+        if apply_bandpass:
+            try:
+                import scipy.signal
+                nyquist = sr / 2.0
+                low = max(0.001, f_min / nyquist)
+                high = min(0.999, f_max / nyquist)
+                padlen = 30
+                if len(audio) > padlen and low < high:
+                    sos = scipy.signal.butter(5, [low, high], btype='bandpass', output='sos')
+                    audio = scipy.signal.sosfiltfilt(sos, audio).astype(np.float32)
+            except Exception as exc:
+                logger.warning("Butterworth filtering failed, using unfiltered audio: %s", exc)
+
         try:
             import librosa
             mel_spec = librosa.feature.melspectrogram(
@@ -145,8 +162,14 @@ class AudioPreprocessor:
                 power=2.0
             )
             if to_db:
-                mel_spec = librosa.power_to_db(mel_spec, ref=np.max)
-            return mel_spec
+                mel_spec = librosa.power_to_db(mel_spec, ref=np.max, top_db=80.0)
+
+            if normalization == 'minmax_01':
+                mel_spec = np.clip((mel_spec + 80.0) / 80.0, 0.0, 1.0)
+            elif normalization == 'standard':
+                mel_spec = (mel_spec - np.mean(mel_spec)) / (np.std(mel_spec) + 1e-7)
+
+            return mel_spec.astype(np.float32)
         except ImportError:
             # Fallback using standard numpy/scipy if librosa is not yet loaded
             return cls._fallback_stft_spectrogram(audio, sr, n_mels, n_fft, hop_length)
@@ -176,6 +199,8 @@ class AudioPreprocessor:
         hop_length = config.get('hop_length', 512)
         f_min = config.get('f_min', 50.0)
         f_max = config.get('f_max', 2000.0)
+        apply_bandpass = config.get('apply_bandpass', False)
+        normalization = config.get('normalization', None)
 
         # 1. Load audio
         audio, sr = cls.load_audio(audio_path, target_sr=target_sr)
@@ -191,7 +216,9 @@ class AudioPreprocessor:
             hop_length=hop_length,
             f_min=f_min,
             f_max=f_max,
-            to_db=True
+            to_db=True,
+            apply_bandpass=apply_bandpass,
+            normalization=normalization
         )
 
         # 3. Add batch and channel dimensions for 2D-CNN: (batch, height, width, channels)
@@ -207,12 +234,15 @@ class AudioPreprocessor:
             if target_w:
                 current_w = input_tensor.shape[2]
                 if current_w < target_w:
-                    # Pad time dimension with zeros
+                    # Symmetric center-pad time dimension with zeros
                     pad_w = target_w - current_w
-                    input_tensor = np.pad(input_tensor, ((0, 0), (0, 0), (0, pad_w), (0, 0)), mode='constant')
+                    pad_left = pad_w // 2
+                    pad_right = pad_w - pad_left
+                    input_tensor = np.pad(input_tensor, ((0, 0), (0, 0), (pad_left, pad_right), (0, 0)), mode='constant')
                 elif current_w > target_w:
-                    # Slice time dimension
-                    input_tensor = input_tensor[:, :, :target_w, :]
+                    # Center-crop time dimension
+                    crop_start = (current_w - target_w) // 2
+                    input_tensor = input_tensor[:, :, crop_start:crop_start + target_w, :]
 
         return input_tensor.astype(np.float32)
 

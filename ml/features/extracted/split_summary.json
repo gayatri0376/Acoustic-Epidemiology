@@ -1,0 +1,67 @@
+{
+  "total_train_records": 1949,
+  "total_train_patients": 251,
+  "held_out_inter_records": 355,
+  "held_out_inter_patients": 41,
+  "intra_test_records": 379,
+  "intra_test_patients": 162,
+  "train_inter_patient_overlap": 0,
+  "folds": {
+    "fold_0": {
+      "record_count": 390,
+      "patient_count": 50,
+      "class_distribution": {
+        "Normal": 261,
+        "Poor Quality": 36,
+        "DAS": 49,
+        "CAS & DAS": 19,
+        "CAS": 25
+      }
+    },
+    "fold_1": {
+      "record_count": 390,
+      "patient_count": 51,
+      "class_distribution": {
+        "Normal": 261,
+        "DAS": 50,
+        "Poor Quality": 35,
+        "CAS & DAS": 19,
+        "CAS": 25
+      }
+    },
+    "fold_2": {
+      "record_count": 390,
+      "patient_count": 46,
+      "class_distribution": {
+        "Normal": 260,
+        "Poor Quality": 35,
+        "DAS": 50,
+        "CAS": 26,
+        "CAS & DAS": 19
+      }
+    },
+    "fold_3": {
+      "record_count": 390,
+      "patient_count": 54,
+      "class_distribution": {
+        "Poor Quality": 36,
+        "Normal": 260,
+        "DAS": 50,
+        "CAS & DAS": 19,
+        "CAS": 25
+      }
+    },
+    "fold_4": {
+      "record_count": 389,
+      "patient_count": 50,
+      "class_distribution": {
+        "Poor Quality": 35,
+        "Normal": 261,
+        "CAS": 25,
+        "DAS": 49,
+        "CAS & DAS": 19
+      }
+    }
+  },
+  "split_manifest_path": "ml/features/extracted/dataset_split_manifest.csv"
+}

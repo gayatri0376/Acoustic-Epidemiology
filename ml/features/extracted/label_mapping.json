@@ -1,0 +1,117 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-10-21T11:15:00Z",
+  "dataset_provenance": "SPRSound (SJTU Paediatric Respiratory Sound Database) CC BY 4.0",
+  "primary_target": {
+    "task_id": "SPRSOUND_RECORD_4CLASS",
+    "name": "SPRSound Pediatric Acoustic Record Classification (Adventitious Sound Types)",
+    "description": "Classification of pediatric auscultation recordings into baseline normal and adventitious respiratory sound categories, with poor-quality recordings handled via explicit exclusion.",
+    "level": "record_level",
+    "source_field": "record_annotation",
+    "num_classes": 4,
+    "class_to_index": {
+      "Normal": 0,
+      "CAS": 1,
+      "DAS": 2,
+      "CAS & DAS": 3
+    },
+    "index_to_class": {
+      "0": "Normal",
+      "1": "CAS",
+      "2": "DAS",
+      "3": "CAS & DAS"
+    },
+    "class_descriptions": {
+      "Normal": "Clear vesicular breath sounds without adventitious noises.",
+      "CAS": "Continuous Adventitious Sounds (wheezes or rhonchi present in breath cycles).",
+      "DAS": "Discontinuous Adventitious Sounds (fine or coarse crackles present in breath cycles).",
+      "CAS & DAS": "Co-occurrence of both continuous (wheezes/rhonchi) and discontinuous (crackles) adventitious sounds."
+    },
+    "quality_handling": {
+      "poor_quality_label": "Poor Quality",
+      "policy": "EXCLUDE_FROM_TRAINING_AND_ROUTE_TO_REJECTION",
+      "rationale": "Poor quality recordings exhibit heavy acoustic noise, crying, sensor movement, or uninterpretable SNR. Including them as a disease or sound class pollutes acoustic representations. In production inference, recordings with poor signal quality are rejected before adventitious classification."
+    }
+  },
+  "quality_detection_target": {
+    "task_id": "SPRSOUND_RECORD_5CLASS_WITH_QUALITY",
+    "name": "SPRSound Acoustic Classification with Explicit Quality State",
+    "description": "5-class acoustic classification including signal quality triage.",
+    "num_classes": 5,
+    "class_to_index": {
+      "Normal": 0,
+      "CAS": 1,
+      "DAS": 2,
+      "CAS & DAS": 3,
+      "Poor Quality": 4
+    },
+    "index_to_class": {
+      "0": "Normal",
+      "1": "CAS",
+      "2": "DAS",
+      "3": "CAS & DAS",
+      "4": "Poor Quality"
+    }
+  },
+  "ternary_target": {
+    "task_id": "SPRSOUND_RECORD_TERNARY",
+    "name": "SPRSound Challenge Task 2-1 (Ternary)",
+    "description": "High-level tri-state classification: Normal, Adventitious (CAS, DAS, CAS&DAS), and Poor Quality.",
+    "num_classes": 3,
+    "class_to_index": {
+      "Normal": 0,
+      "Adventitious": 1,
+      "Poor Quality": 2
+    },
+    "index_to_class": {
+      "0": "Normal",
+      "1": "Adventitious",
+      "2": "Poor Quality"
+    },
+    "source_mapping": {
+      "Normal": "Normal",
+      "CAS": "Adventitious",
+      "DAS": "Adventitious",
+      "CAS & DAS": "Adventitious",
+      "Poor Quality": "Poor Quality"
+    }
+  },
+  "event_level_target": {
+    "task_id": "SPRSOUND_EVENT_7CLASS",
+    "name": "SPRSound Challenge Task 1-2 (Event Level Multiclass)",
+    "description": "Classification of segmented respiratory cycle intervals based on expert acoustic annotations.",
+    "level": "event_level",
+    "source_field": "event_annotation.type",
+    "num_classes": 7,
+    "class_to_index": {
+      "Normal": 0,
+      "Fine Crackle": 1,
+      "Wheeze": 2,
+      "Coarse Crackle": 3,
+      "Rhonchi": 4,
+      "Wheeze+Crackle": 5,
+      "Stridor": 6
+    },
+    "index_to_class": {
+      "0": "Normal",
+      "1": "Fine Crackle",
+      "2": "Wheeze",
+      "3": "Coarse Crackle",
+      "4": "Rhonchi",
+      "5": "Wheeze+Crackle",
+      "6": "Stridor"
+    }
+  },
+  "clinical_disease_distinction": {
+    "status": "PATIENT_LEVEL_METADATA_ONLY",
+    "warning": "Clinical disease labels in SPRSound are patient-level discharge/admission diagnoses (e.g., Pneumonia, Asthma, Bronchitis). They are NOT recording-level acoustic labels. Assigning a patient's pneumonia diagnosis to a recording at chest location p3 that contains purely normal breath sounds induces severe label noise and clinical inconsistency. True clinical disease diagnosis requires multi-site pooling and clinical evidence integration.",
+    "patient_summary_classes": [
+      "Pneumonia (non-severe)",
+      "Asthma",
+      "Other respiratory diseases",
+      "Control Group",
+      "Pneumonia (severe)",
+      "Bronchitis"
+    ]
+  }
+}

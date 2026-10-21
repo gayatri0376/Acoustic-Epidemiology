@@ -1,0 +1,100 @@
+{
+  "success": true,
+  "status": "EVALUATED",
+  "model_artifact": "ml/models/saved_models/sprsound-cnn-v1-fold0.keras",
+  "task_id": "SPRSOUND_RECORD_4CLASS",
+  "partition": "inter_2022",
+  "data_metadata": {
+    "partition": "inter_2022",
+    "split_category": "held_out_inter_test",
+    "total_manifest_records": 355,
+    "evaluated_records": 347,
+    "unique_patients": 41,
+    "excluded_poor_quality": 8,
+    "class_distribution": {
+      "0": 241,
+      "1": 65,
+      "3": 17,
+      "2": 24
+    }
+  },
+  "metrics": {
+    "recording_level": {
+      "total_recordings": 347,
+      "accuracy": 0.6945,
+      "macro_precision": 0.1736,
+      "macro_recall": 0.25,
+      "macro_f1": 0.2049,
+      "weighted_precision": 0.4824,
+      "weighted_recall": 0.6945,
+      "weighted_f1": 0.5693,
+      "confusion_matrix": [
+        [
+          241,
+          0,
+          0,
+          0
+        ],
+        [
+          65,
+          0,
+          0,
+          0
+        ],
+        [
+          24,
+          0,
+          0,
+          0
+        ],
+        [
+          17,
+          0,
+          0,
+          0
+        ]
+      ],
+      "classes": [
+        "Normal",
+        "CAS",
+        "DAS",
+        "CAS & DAS"
+      ],
+      "per_class": {
+        "Normal": {
+          "class_index": 0,
+          "precision": 0.6945,
+          "recall": 1.0,
+          "f1_score": 0.8197,
+          "support": 241
+        },
+        "CAS": {
+          "class_index": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1_score": 0.0,
+          "support": 65
+        },
+        "DAS": {
+          "class_index": 2,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1_score": 0.0,
+          "support": 24
+        },
+        "CAS & DAS": {
+          "class_index": 3,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1_score": 0.0,
+          "support": 17
+        }
+      }
+    },
+    "patient_level_majority_vote": {
+      "total_patients": 41,
+      "patient_accuracy": 0.7561,
+      "patient_macro_f1": 0.2153
+    }
+  }
+}

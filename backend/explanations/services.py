@@ -89,21 +89,107 @@ class GradCamService:
                     "message": "The active model architecture lacks Conv2D layers required for Grad-CAM gradient backpropagation."
                 }
 
-            # 3. Authentic Grad-CAM Generation Placeholder
-            # Once real CNN weights are mounted by the ML teammate:
-            # - Construct grad model: tf.keras.models.Model(inputs=model.inputs, outputs=[model.get_layer(last_conv_name).output, model.output])
-            # - Compute gradient of predicted class with respect to last_conv_name feature maps
-            # - Pool gradients and calculate weighted activation map
-            # - Render heatmap overlay over the audio's Mel-Spectrogram and persist to media/explanations/<uuid>.png
-            explanation = Explanation.objects.create(
-                prediction=prediction,
-                method=method,
-                status=ExplanationStatus.PENDING
-            )
-            return {
-                "success": True,
-                "explanation": explanation
-            }
+            # 3. Authentic Grad-CAM Generation
+            try:
+                import tensorflow as tf
+                import numpy as np
+                from pathlib import Path
+                from ml_inference.services import AudioPreprocessor
+
+                # Construct grad model
+                grad_model = tf.keras.models.Model(
+                    inputs=model.inputs,
+                    outputs=[model.get_layer(last_conv_name).output, model.output]
+                )
+
+                # Preprocess input audio using model's configured parameters
+                input_tensor = AudioPreprocessor.prepare_cnn_input(
+                    audio_path=prediction.recording.audio_file.path,
+                    config=model_version.preprocessing_config,
+                    expected_shape=getattr(model, 'input_shape', None)
+                )
+
+                # Target class index
+                verified_classes = model_version.verified_classes or []
+                if prediction.predicted_class in verified_classes:
+                    pred_index = verified_classes.index(prediction.predicted_class)
+                else:
+                    pred_index = 0
+
+                with tf.GradientTape() as tape:
+                    conv_outputs, predictions = grad_model(input_tensor)
+                    loss = predictions[:, pred_index]
+
+                grads = tape.gradient(loss, conv_outputs)
+                pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+                heatmap = tf.reduce_sum(tf.multiply(pooled_grads, conv_outputs[0]), axis=-1).numpy()
+                heatmap = np.maximum(heatmap, 0)
+                max_val = np.max(heatmap)
+                if max_val > 0:
+                    heatmap = heatmap / max_val
+
+                # Structured explainability data
+                time_profile = [round(float(v), 4) for v in np.mean(heatmap, axis=0)]
+                freq_profile = [round(float(v), 4) for v in np.mean(heatmap, axis=1)]
+                structured_data = {
+                    "method": "Grad-CAM",
+                    "conv_layer": last_conv_name,
+                    "target_class": prediction.predicted_class,
+                    "time_saliency_profile": time_profile,
+                    "frequency_saliency_profile": freq_profile,
+                    "interpretability_notice": (
+                        "Grad-CAM highlights time-frequency regions in the Mel-Spectrogram that contributed "
+                        "most strongly to the model's acoustic classification. It does NOT constitute a clinical diagnosis "
+                        "or causal medical explanation."
+                    )
+                }
+
+                # Save heatmap visualization
+                media_dir = Path(settings.MEDIA_ROOT) / "explanations"
+                media_dir.mkdir(parents=True, exist_ok=True)
+                artifact_filename = f"{prediction.id}_gradcam.png"
+                artifact_rel_path = f"media/explanations/{artifact_filename}"
+                artifact_full_path = media_dir / artifact_filename
+
+                import matplotlib
+                matplotlib.use('Agg')
+                import matplotlib.pyplot as plt
+
+                fig, ax = plt.subplots(figsize=(6, 4))
+                im = ax.imshow(heatmap, cmap='inferno', aspect='auto', origin='lower')
+                ax.set_title(f"Grad-CAM Saliency: {prediction.predicted_class}")
+                ax.set_xlabel("Time Frames")
+                ax.set_ylabel("Mel Frequency Bands")
+                fig.colorbar(im, ax=ax)
+                fig.tight_layout()
+                fig.savefig(str(artifact_full_path), dpi=100)
+                plt.close(fig)
+
+                explanation = Explanation.objects.create(
+                    prediction=prediction,
+                    method=method,
+                    status=ExplanationStatus.GENERATED,
+                    artifact_path=artifact_rel_path,
+                    structured_data=structured_data
+                )
+                return {
+                    "success": True,
+                    "explanation": explanation
+                }
+
+            except ImportError:
+                explanation = Explanation.objects.create(
+                    prediction=prediction,
+                    method=method,
+                    status=ExplanationStatus.UNSUPPORTED,
+                    error_details="TensorFlow is not installed in the environment to execute gradient backpropagation."
+                )
+                return {
+                    "success": False,
+                    "code": "GRADIENT_MODEL_UNAVAILABLE",
+                    "explanation": explanation,
+                    "message": "TensorFlow gradient backpropagation requires TensorFlow to be installed."
+                }
 
         except Exception as exc:
             logger.exception("Grad-CAM generation error: %s", exc)
@@ -119,3 +205,4 @@ class GradCamService:
                 "explanation": explanation,
                 "message": str(exc)
             }
+

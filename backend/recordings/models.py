@@ -39,6 +39,8 @@ class PatientAgeGroup(models.TextChoices):
     PRESCHOOL = 'PRESCHOOL', 'Preschool (3-5 years)'
     SCHOOL_AGE = 'SCHOOL_AGE', 'School Age (6-12 years)'
     ADOLESCENT = 'ADOLESCENT', 'Adolescent (13-18 years)'
+    ADULT = 'ADULT', 'Adult (19-64 years)'
+    GERIATRIC = 'GERIATRIC', 'Geriatric / Senior (65+ years)'
     UNKNOWN = 'UNKNOWN', 'Unknown / Not Stated'
 
 

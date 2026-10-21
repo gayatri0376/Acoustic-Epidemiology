@@ -129,6 +129,68 @@ class MLInferenceTests(TestCase):
         self.assertTrue(mel_spec.shape[1] > 0)
         self.assertFalse(np.isnan(mel_spec).any())
 
+    def test_audio_preprocessor_with_8khz_and_normalization(self):
+        import numpy as np
+        from ml_inference.services import AudioPreprocessor
+        # 8kHz synthetic breath signal
+        t = np.linspace(0, 1.0, 8000, endpoint=False)
+        audio = (0.4 * np.sin(2 * np.pi * 350 * t)).astype(np.float32)
+
+        mel_norm = AudioPreprocessor.compute_mel_spectrogram(
+            audio=audio,
+            sr=8000,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512,
+            f_min=50.0,
+            f_max=2000.0,
+            apply_bandpass=True,
+            normalization='minmax_01'
+        )
+        self.assertEqual(mel_norm.shape[0], 128)
+        self.assertTrue(mel_norm.min() >= 0.0)
+        self.assertTrue(mel_norm.max() <= 1.0)
+        self.assertFalse(np.isnan(mel_norm).any())
+
+    def test_audio_preprocessor_prepare_cnn_input_8khz_alignment(self):
+        import os
+        import numpy as np
+        import soundfile as sf
+        import tempfile
+        from ml_inference.services import AudioPreprocessor
+
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            # 9-second synthetic 8kHz signal
+            t = np.linspace(0, 9.0, 72000, endpoint=False)
+            audio = (0.3 * np.sin(2 * np.pi * 400 * t)).astype(np.float32)
+            sf.write(tmp_path, audio, 8000)
+
+            config = {
+                'sample_rate': 8000,
+                'n_mels': 128,
+                'n_fft': 1024,
+                'hop_length': 512,
+                'f_min': 50.0,
+                'f_max': 2000.0,
+                'apply_bandpass': True,
+                'normalization': 'minmax_01'
+            }
+            tensor = AudioPreprocessor.prepare_cnn_input(
+                audio_path=tmp_path,
+                config=config,
+                expected_shape=[1, 128, 128, 1]
+            )
+            self.assertEqual(tensor.shape, (1, 128, 128, 1))
+            self.assertEqual(tensor.dtype, np.float32)
+            self.assertTrue(tensor.min() >= 0.0)
+            self.assertTrue(tensor.max() <= 1.0)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
     def test_model_cache_clear(self):
         from ml_inference.services import ModelCache
         ModelCache.clear()
@@ -328,19 +390,22 @@ class ModelRegistrationCommandTests(TestCase):
     def test_missing_tensorflow_runtime_fails_gracefully(self):
         """DEPENDENCY GUARD: Verifies graceful failure when TensorFlow is not installed."""
         from django.core.management import call_command, CommandError
+        from unittest.mock import patch
         temp_artifact = self._create_temp_artifact("valid_name.keras")
         rel_path = str(temp_artifact.relative_to(self.project_root))
 
-        # Because tensorflow is not installed in the test environment, this must fail gracefully
-        with self.assertRaises(CommandError) as ctx:
-            call_command(
-                'register_model',
-                '--model-version', 'test-dep-v1',
-                '--artifact-path', rel_path,
-                '--classes', 'Normal', 'Wheeze', 'Crackle',
-            )
-        self.assertIn("ML Runtime Dependency Error", str(ctx.exception))
-        self.assertIn("TensorFlow/Keras is not installed", str(ctx.exception))
+        # Simulate tensorflow being uninstalled
+        with patch.dict('sys.modules', {'tensorflow': None}):
+            with self.assertRaises(CommandError) as ctx:
+                call_command(
+                    'register_model',
+                    '--model-version', 'test-dep-v1',
+                    '--artifact-path', rel_path,
+                    '--classes', 'Normal', 'Wheeze', 'Crackle',
+                )
+            self.assertIn("ML Runtime Dependency Error", str(ctx.exception))
+            self.assertIn("TensorFlow/Keras is not installed", str(ctx.exception))
+
 
     def test_dimension_mismatch_with_mocked_model(self):
         """
