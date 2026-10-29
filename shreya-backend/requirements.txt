@@ -1,0 +1,11 @@
+# Version ranges (not exact pins) because these were not installed/verified when this scaffold was written.
+# After a successful install, run "pip freeze > requirements.lock.txt" to record the exact versions you tested.
+Django>=5.1,<5.3
+djangorestframework>=3.15
+djangorestframework-simplejwt>=5.3
+django-cors-headers>=4.4
+python-dotenv>=1.0
+# MySQL driver. PyMySQL installs on Windows without a compiler. "cryptography" is needed for MySQL 8 logins.
+# (Optional: you may use "mysqlclient" instead; config/__init__.py prefers it if present.)
+PyMySQL>=1.1
+cryptography>=42
