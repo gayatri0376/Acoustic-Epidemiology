@@ -1,0 +1,57 @@
+/* Dashboard shell: navy sidebar + content area */
+.shell { min-height: 100vh; display: grid; grid-template-columns: 264px minmax(0, 1fr); }
+.sidebar { background: var(--navy); color: #dbe6f1; padding: 22px 16px; display: flex; flex-direction: column; gap: 24px; position: sticky; top: 0; height: 100vh; }
+.nav { display: grid; gap: 4px; }
+.nav a { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: #c5d3e2; text-decoration: none; font-weight: 500; font-size: 0.93rem; }
+.nav a:hover { background: rgba(255,255,255,.07); color: #fff; }
+.side-user { margin-top: auto; font-size: 0.82rem; color: #9fb3c8; padding: 0 12px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px clamp(16px, 3vw, 32px); background: var(--white); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+.topbar .who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.topbar .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-btn { display: none; }
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; background: var(--mint); color: var(--teal-dark); text-transform: capitalize; }
+.badge.grey { background: #eaeff5; color: var(--muted-text); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.ok { background: #e3f6ee; color: var(--ok); }
+.badge.bad { background: var(--danger-bg); color: var(--danger); }
+
+.content { padding: clamp(16px, 3vw, 32px); display: grid; gap: 24px; max-width: 1180px; width: 100%; }
+.demo-banner { background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid #f5dba5; padding: 8px 16px; font-size: 0.85rem; text-align: center; font-weight: 600; }
+
+.hero { background: linear-gradient(120deg, var(--mint), #fff); border: 1px solid #bfe9e2; border-radius: var(--radius); padding: 24px; }
+.hero h1 { font-size: 1.6rem; margin-bottom: 6px; }
+.hero p { color: var(--muted-text); }
+
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card-head svg { color: var(--teal); }
+.card-head h2 { font-size: 1.05rem; }
+.stat .label { font-size: 0.82rem; color: var(--muted-text); }
+.stat .value { font-size: 1.9rem; font-weight: 700; margin-top: 2px; }
+.section { scroll-margin-top: 84px; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-size: 0.78rem; color: var(--muted-text); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.empty { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 28px 12px; color: var(--muted-text); border: 1.5px dashed var(--border); border-radius: 12px; font-size: 0.9rem; }
+.empty svg { color: var(--muted); }
+.empty strong { color: var(--slate); }
+.search { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); border-radius: 10px; padding: 0 12px; min-height: 42px; margin-bottom: 14px; max-width: 360px; }
+.search input { border: 0; outline: none; flex: 1; background: transparent; min-width: 0; }
+.search:focus-within { border-color: var(--teal); }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; margin: 0; font-size: 0.92rem; }
+dl.kv dt { color: var(--muted-text); }
+dl.kv dd { margin: 0; }
+.scrim { display: none; }
+
+@media (max-width: 880px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 272px; z-index: 20; transform: translateX(-100%); transition: transform 0.2s; }
+  .sidebar.open { transform: none; }
+  .scrim.open { display: block; position: fixed; inset: 0; background: rgba(16,40,63,.45); z-index: 15; }
+  .menu-btn { display: inline-flex; }
+}
