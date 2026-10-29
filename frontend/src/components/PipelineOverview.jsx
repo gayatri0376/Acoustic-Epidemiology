@@ -1,77 +1,72 @@
 import React from 'react';
 import { 
   Sliders, 
-  BarChart2, 
+  Filter, 
   BrainCircuit, 
   Eye, 
+  AudioWaveform,
   Sparkles
 } from 'lucide-react';
 
-
-const STEPS = [
+const PIPELINE_STAGES = [
   {
     step: '01',
     title: 'Acoustic Capture',
-    tech: 'Pediatric Auscultation',
-    icon: Sliders,
+    subtitle: 'Pediatric Auscultation',
+    icon: AudioWaveform,
     badge: 'Raw Audio',
-    color: 'border-cyan',
-    desc: 'Pediatric chest sounds captured via digital stethoscope. Audio normalized, split into respiration cycles, and resampled to 16kHz.'
+    desc: 'Pediatric respiratory sounds recorded via electronic stethoscope. Audio is validated for RIFF/WAV headers, minimum 0.2s duration, and sampled at 8kHz / 16kHz.'
   },
   {
     step: '02',
-    title: 'Denoising & Filters',
-    tech: 'SciPy & NumPy',
-    icon: BarChart2,
-    badge: 'Signal Prep',
-    color: 'border-indigo',
-    desc: '5th-order Butterworth bandpass filter (50Hz - 2000Hz) attenuates ambient room noise, heart beats, and friction artifacts.'
+    title: 'Zero-Phase Bandpass',
+    subtitle: 'Butterworth Denoising',
+    icon: Filter,
+    badge: '50 Hz – 2000 Hz',
+    desc: 'A 5th-order digital Butterworth bandpass filter attenuates heart sounds (<50 Hz), patient motion artifacts, and ambient room noise above 2000 Hz.'
   },
   {
     step: '03',
     title: 'Log Mel-Spectrogram',
-    tech: 'Librosa / STFT',
-    icon: BrainCircuit,
-    badge: 'Time-Frequency',
-    color: 'border-blue',
-    desc: 'Short-Time Fourier Transform (STFT) transforms 1D temporal pressure waveforms into 128-band Log-Mel 2D energy spectrograms.'
+    subtitle: 'Time-Frequency Extraction',
+    icon: Sliders,
+    badge: '128 Mel Bands',
+    desc: 'Short-Time Fourier Transform (STFT) with 1024 FFT length and 512 hop length transforms 1D waveforms into 2D time-frequency energy distributions normalized to [0, 1].'
   },
   {
     step: '04',
-    title: '2D-CNN Classifier',
-    tech: 'TensorFlow / Keras',
+    title: '2D-CNN Classification',
+    subtitle: 'Deep Feature Learning',
     icon: BrainCircuit,
-    badge: 'Deep Learning',
-    color: 'border-emerald',
-    desc: 'Multi-layer 2D Convolutional Neural Network extracts spatial-temporal acoustic features to predict disease categories (Normal, Wheeze, Crackle).'
+    badge: 'Softmax Output',
+    desc: 'Multi-layer 2D Convolutional Neural Network extracts spatial-temporal acoustic features to classify recordings into Normal, CAS, DAS, or CAS & DAS.'
   },
   {
     step: '05',
     title: 'Grad-CAM Saliency',
-    tech: 'Explainable AI',
+    subtitle: 'Visual Explainability',
     icon: Eye,
-    badge: 'Clinician Trust',
-    color: 'border-amber',
-    desc: 'Gradient-weighted Class Activation Mapping overlays heatmap activations onto spectrograms, proving clinical basis of prediction.'
+    badge: 'Gradient Attribution',
+    desc: 'Gradient-weighted Class Activation Mapping backpropagates gradients from the final Conv2D layer to project acoustic focus regions onto the spectrogram.'
   }
 ];
 
 export default function PipelineOverview() {
   return (
-    <section id="pipeline-section" className="section-container">
-      <div className="section-header">
+    <section id="methodology-section" className="section-container">
+      <div className="section-header text-center">
         <span className="badge badge-cyan">
-          <Sparkles size={14} /> Methodology
+          <Sparkles size={14} /> Technical Architecture
         </span>
         <h2 className="section-title">Acoustic Deep Learning Pipeline</h2>
         <p className="section-description">
-          The planned multi-stage pipeline converting non-invasive pediatric chest sounds into explainable diagnostic predictions.
+          End-to-end clinical AI workflow translating pediatric auscultation sounds into verified, interpretable classifications.
         </p>
       </div>
 
       <div className="pipeline-steps-wrapper">
         <div className="pipeline-grid">
-          {STEPS.map((item) => {
+          {PIPELINE_STAGES.map((item) => {
             const Icon = item.icon;
             return (
               <div key={item.step} className="pipeline-card glass-panel" id={`pipeline-step-${item.step}`}>
@@ -85,7 +80,7 @@ export default function PipelineOverview() {
                 </div>
 
                 <h3 className="pipeline-title">{item.title}</h3>
-                <span className="pipeline-tech font-mono">{item.tech}</span>
+                <span className="pipeline-tech font-mono">{item.subtitle}</span>
                 <p className="pipeline-desc">{item.desc}</p>
               </div>
             );
