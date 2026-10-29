@@ -365,4 +365,3 @@ export async function submitAssessment(predictionId, assessmentData, token) {
 }
 
 export { API_BASE_URL };
-

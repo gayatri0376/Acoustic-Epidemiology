@@ -1,0 +1,64 @@
+{
+  "task_id": "SPRSOUND_DISEASE_3CLASS",
+  "total_records": 1634,
+  "total_unique_patients": 226,
+  "overall_class_distribution": {
+    "Pneumonia": 1257,
+    "Wheezing Disorders": 261,
+    "Healthy Control": 116
+  },
+  "overall_patient_distribution": {
+    "Pneumonia": 164,
+    "Wheezing Disorders": 45,
+    "Healthy Control": 17
+  },
+  "fold_statistics": {
+    "fold_0": {
+      "records": 357,
+      "patients": 45,
+      "class_distribution": {
+        "Pneumonia": 247,
+        "Wheezing Disorders": 77,
+        "Healthy Control": 33
+      }
+    },
+    "fold_1": {
+      "records": 326,
+      "patients": 45,
+      "class_distribution": {
+        "Pneumonia": 257,
+        "Wheezing Disorders": 43,
+        "Healthy Control": 26
+      }
+    },
+    "fold_2": {
+      "records": 279,
+      "patients": 46,
+      "class_distribution": {
+        "Pneumonia": 195,
+        "Healthy Control": 28,
+        "Wheezing Disorders": 56
+      }
+    },
+    "fold_3": {
+      "records": 330,
+      "patients": 45,
+      "class_distribution": {
+        "Pneumonia": 280,
+        "Wheezing Disorders": 34,
+        "Healthy Control": 16
+      }
+    },
+    "fold_4": {
+      "records": 342,
+      "patients": 45,
+      "class_distribution": {
+        "Wheezing Disorders": 51,
+        "Pneumonia": 278,
+        "Healthy Control": 13
+      }
+    }
+  },
+  "patient_overlap_count": 0,
+  "zero_patient_leakage_verified": true
+}

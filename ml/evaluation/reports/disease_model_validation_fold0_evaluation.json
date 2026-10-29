@@ -1,0 +1,157 @@
+{
+  "evaluation_protocol": {
+    "status": "VALIDATION_FOLD_ONLY",
+    "note": "This evaluation uses validation fold 0 \u2014 the fold held out during training. The disease_split_manifest.csv does not include a separate independent test set. Results represent internal cross-validation performance, NOT independent generalization. An independent test set evaluation requires a separate patient-disjoint test split not present in the current dataset preparation.",
+    "fold": 0,
+    "total_val_samples": 357,
+    "unique_val_patients": 45
+  },
+  "dataset": {
+    "source": "SPRSound (SJTU Paediatric Respiratory Sound Database)",
+    "license": "CC BY 4.0",
+    "population": "Pediatric patients (0\u201316.2 years)",
+    "label_provenance": "Patient-level hospital admission/discharge diagnoses",
+    "label_mapping": {
+      "0": "Healthy Control",
+      "1": "Pneumonia",
+      "2": "Wheezing Disorders"
+    },
+    "label_grouping_rationale": {
+      "Pneumonia": "Merges 'Pneumonia (non-severe)' and 'Pneumonia (severe)' from SPRSound summaries.",
+      "Wheezing Disorders": "Merges 'Asthma' and 'Bronchitis' because both produce wheezing (CAS) and the dataset does not provide acoustic evidence to distinguish them. Do NOT separate these as asthma vs bronchitis predictions.",
+      "Healthy Control": "Maps to 'Control Group' patients in SPRSound summaries."
+    }
+  },
+  "model_config": {
+    "model_version": "sprsound-disease-cnn-v1",
+    "task_id": "SPRSOUND_DISEASE_3CLASS",
+    "task_type": "DISEASE_CLASSIFICATION",
+    "input_shape": [
+      null,
+      128,
+      128,
+      1
+    ],
+    "verified_classes": [
+      "Healthy Control",
+      "Pneumonia",
+      "Wheezing Disorders"
+    ],
+    "target_conv_layer": "last_conv_layer",
+    "output_activation": "softmax",
+    "preprocessing_config": {
+      "sample_rate": 8000,
+      "n_mels": 128,
+      "n_fft": 1024,
+      "hop_length": 512,
+      "f_min": 50.0,
+      "f_max": 2000.0,
+      "apply_bandpass": true,
+      "top_db": 80.0,
+      "normalization": "minmax_01"
+    },
+    "fold_metadata": {
+      "val_fold": 0,
+      "train_samples": 1277,
+      "val_samples": 357,
+      "train_patients": 181,
+      "val_patients": 45,
+      "patient_overlap": 0,
+      "train_class_counts": {
+        "1": 1010,
+        "2": 184,
+        "0": 83
+      },
+      "val_class_counts": {
+        "1": 247,
+        "2": 77,
+        "0": 33
+      },
+      "class_weights": {
+        "0": 5.128514056224899,
+        "1": 0.42145214521452146,
+        "2": 2.3134057971014492
+      }
+    },
+    "epochs_trained": 7,
+    "best_artifact_path": "ml/models/saved_models/sprsound-disease-cnn-v1.keras"
+  },
+  "recording_level_results": {
+    "per_class": {
+      "Healthy Control": {
+        "support": 33,
+        "precision": 0.0924,
+        "recall": 1.0,
+        "f1": 0.1692,
+        "tp": 33,
+        "fp": 324,
+        "fn": 0
+      },
+      "Pneumonia": {
+        "support": 247,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 247
+      },
+      "Wheezing Disorders": {
+        "support": 77,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 77
+      }
+    },
+    "macro_f1": 0.0564,
+    "macro_precision": 0.0308,
+    "macro_recall": 0.3333,
+    "balanced_accuracy": 0.3333,
+    "overall_accuracy": 0.0924,
+    "confusion_matrix": [
+      [
+        33,
+        0,
+        0
+      ],
+      [
+        247,
+        0,
+        0
+      ],
+      [
+        77,
+        0,
+        0
+      ]
+    ],
+    "confusion_matrix_class_order": [
+      "Healthy Control",
+      "Pneumonia",
+      "Wheezing Disorders"
+    ]
+  },
+  "patient_level_results": {
+    "total_patients": 45,
+    "correct_patients": 4,
+    "patient_accuracy": 0.0889
+  },
+  "class_sample_counts": {
+    "Healthy Control": 33,
+    "Pneumonia": 247,
+    "Wheezing Disorders": 77
+  },
+  "limitations": [
+    "Evaluation uses validation fold 0 only (not an independent held-out test set).",
+    "Disease labels are patient-level; individual auscultation sites may show acoustic patterns inconsistent with the systemic diagnosis.",
+    "Training data is heavily imbalanced (Pneumonia ~77% of records).",
+    "Class weights were applied during training but Healthy Control remains very sparse (83 train, 33 val).",
+    "Model trained for only 7 epochs; validation loss was increasing, suggesting the model did not fully converge on all classes.",
+    "Pediatric population only (0\u201316.2 years). Do not apply to adult recordings.",
+    "Wheezing Disorders merges Asthma and Bronchitis \u2014 cannot be separated acoustically from SPRSound labels.",
+    "Results are a research screening output and must NOT be used for clinical diagnosis."
+  ]
+}

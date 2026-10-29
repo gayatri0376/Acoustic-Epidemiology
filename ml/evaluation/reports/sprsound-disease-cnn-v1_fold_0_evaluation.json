@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "status": "EVALUATED",
+  "model_artifact": "ml/models/saved_models/sprsound-disease-cnn-v1.keras",
+  "task_id": "SPRSOUND_DISEASE_3CLASS",
+  "partition": "fold_0",
+  "data_metadata": {
+    "partition": "val_fold_0",
+    "split_category": "held_out_validation_fold",
+    "total_manifest_records": 357,
+    "evaluated_records": 357,
+    "unique_patients": 45,
+    "excluded_poor_quality": 0,
+    "class_distribution": {
+      "1": 247,
+      "2": 77,
+      "0": 33
+    }
+  },
+  "metrics": {
+    "recording_level": {
+      "total_recordings": 357,
+      "accuracy": 0.0924,
+      "balanced_accuracy": 0.3333,
+      "macro_precision": 0.0308,
+      "macro_recall": 0.3333,
+      "macro_f1": 0.0564,
+      "weighted_precision": 0.0085,
+      "weighted_recall": 0.0924,
+      "weighted_f1": 0.0156,
+      "confusion_matrix": [
+        [
+          33,
+          0,
+          0
+        ],
+        [
+          247,
+          0,
+          0
+        ],
+        [
+          77,
+          0,
+          0
+        ]
+      ],
+      "classes": [
+        "Healthy Control",
+        "Pneumonia",
+        "Wheezing Disorders"
+      ],
+      "per_class": {
+        "Healthy Control": {
+          "class_index": 0,
+          "precision": 0.0924,
+          "recall": 1.0,
+          "f1_score": 0.1692,
+          "support": 33
+        },
+        "Pneumonia": {
+          "class_index": 1,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1_score": 0.0,
+          "support": 247
+        },
+        "Wheezing Disorders": {
+          "class_index": 2,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1_score": 0.0,
+          "support": 77
+        }
+      }
+    },
+    "patient_level_majority_vote": {
+      "total_patients": 45,
+      "patient_accuracy": 0.0889,
+      "patient_balanced_accuracy": 0.3333,
+      "patient_macro_f1": 0.0544
+    }
+  }
+}

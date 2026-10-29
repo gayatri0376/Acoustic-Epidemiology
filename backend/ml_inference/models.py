@@ -11,6 +11,11 @@ class ModelStatus(models.TextChoices):
     RETIRED = 'RETIRED', 'Retired / Deprecated'
 
 
+class ModelTaskType(models.TextChoices):
+    SOUND_CLASSIFICATION = 'SOUND_CLASSIFICATION', 'Respiratory Sound Classification'
+    DISEASE_CLASSIFICATION = 'DISEASE_CLASSIFICATION', 'Respiratory Disease Classification'
+
+
 class PredictionStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pending Inference'
     SUCCESS = 'SUCCESS', 'Inference Successful'
@@ -46,6 +51,13 @@ class ModelVersion(models.Model):
     preprocessing_config = models.JSONField(
         default=dict,
         help_text="Acoustic feature settings: sample_rate, n_mels, hop_length, n_fft, bandpass_hz."
+    )
+    task_type = models.CharField(
+        max_length=32,
+        choices=ModelTaskType.choices,
+        default=ModelTaskType.SOUND_CLASSIFICATION,
+        db_index=True,
+        help_text='The prediction task this model was trained to perform.'
     )
     status = models.CharField(
         max_length=32,
@@ -168,3 +180,89 @@ class Prediction(models.Model):
         elif self.prediction_status in (PredictionStatus.FAILED, PredictionStatus.UNAVAILABLE):
             if not self.error_details:
                 raise ValidationError({'error_details': "Failed or unavailable prediction must state error details."})
+
+
+class DiseasePrediction(models.Model):
+    """
+    Disease prediction record from the separate SPRSound-based 3-class disease model
+    (Healthy Control / Pneumonia / Wheezing Disorders).
+
+    IMPORTANT: This prediction is derived from a patient-level multi-site pooling model trained
+    on SPRSound patient-summary diagnoses (hospital admission/discharge). It is a research
+    screening output and MUST NOT be used as a clinical diagnosis.
+
+    Dataset: SPRSound CC BY 4.0 — 100% pediatric patients (max age 16.2 years).
+    Label provenance: Hospital admission/discharge diagnoses from SJTU patient summaries.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recording = models.ForeignKey(
+        'recordings.Recording',
+        on_delete=models.CASCADE,
+        related_name='disease_predictions',
+        db_index=True
+    )
+    model_version = models.ForeignKey(
+        ModelVersion,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='disease_predictions',
+        db_index=True,
+        limit_choices_to={'task_type': ModelTaskType.DISEASE_CLASSIFICATION}
+    )
+    predicted_disease = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text=(
+            "Highest-probability disease screening class. "
+            "Valid values: 'Healthy Control', 'Pneumonia', 'Wheezing Disorders'. "
+            "This is a research output; not a clinical diagnosis."
+        )
+    )
+    probability_scores = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Dictionary mapping verified disease classes to softmax probability values."
+    )
+    prediction_status = models.CharField(
+        max_length=32,
+        choices=PredictionStatus.choices,
+        default=PredictionStatus.PENDING,
+        db_index=True
+    )
+    error_details = models.TextField(
+        blank=True,
+        help_text="Safe technical error diagnostic if disease prediction failed or was unavailable."
+    )
+    inference_duration_ms = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Time taken for audio preprocessing and model forward pass in milliseconds."
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'disease_predictions'
+        verbose_name = 'Disease Prediction'
+        verbose_name_plural = 'Disease Predictions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recording', '-created_at']),
+            models.Index(fields=['prediction_status', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"DiseasePrediction {self.id} for Recording {self.recording_id} ({self.prediction_status})"
+
+    def clean(self):
+        super().clean()
+        if self.prediction_status == PredictionStatus.SUCCESS:
+            if not self.predicted_disease:
+                raise ValidationError({'predicted_disease': "Successful disease prediction must define predicted_disease."})
+            if not self.probability_scores:
+                raise ValidationError({'probability_scores': "Successful disease prediction must contain probability scores."})
+            if not self.model_version:
+                raise ValidationError({'model_version': "Successful disease prediction must link to a valid ModelVersion."})
+        elif self.prediction_status in (PredictionStatus.FAILED, PredictionStatus.UNAVAILABLE):
+            if not self.error_details:
+                raise ValidationError({'error_details': "Failed or unavailable disease prediction must state error details."})
