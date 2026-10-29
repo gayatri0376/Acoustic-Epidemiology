@@ -37,15 +37,29 @@ class RegisterView(APIView):
 class LoginView(APIView):
     """
     Authentication endpoint returning an API Auth Token.
+    Accepts username or email.
     """
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            username = serializer.validated_data['username']
+            ident = serializer.validated_data['username'].strip()
             password = serializer.validated_data['password']
-            user = authenticate(username=username, password=password)
+            
+            # 1. Try standard Django authenticate
+            user = authenticate(request=request, username=ident, password=password)
+
+            # 2. If not authenticated directly, find user by email or username
+            if not user:
+                from django.contrib.auth.models import User
+                matched_user = (
+                    User.objects.filter(email__iexact=ident).first() or
+                    User.objects.filter(username__iexact=ident).first()
+                )
+                if matched_user:
+                    if matched_user.check_password(password) or matched_user.check_password(password.strip()):
+                        user = matched_user
 
             if user:
                 if not user.is_active:
@@ -58,12 +72,13 @@ class LoginView(APIView):
                     {
                         "message": "Authentication successful.",
                         "token": token.key,
+                        "auth_token": token.key,
                         "user": UserSerializer(user).data,
                     },
                     status=status.HTTP_200_OK,
                 )
             return Response(
-                {"error": "Invalid username or password."},
+                {"error": "Invalid username, email, or password."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

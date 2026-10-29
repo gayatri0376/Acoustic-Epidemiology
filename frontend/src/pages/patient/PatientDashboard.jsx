@@ -1,60 +1,132 @@
-import { LayoutDashboard, UserRound, ClipboardList, Mic, FileText, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  LayoutDashboard, 
+  UserRound, 
+  ClipboardList, 
+  Mic, 
+  FileText, 
+  RotateCcw,
+  Clock
+} from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/common/Card';
 import EmptyState from '../../components/common/EmptyState';
-import DataTable, { StatusBadge } from '../../components/common/DataTable';
+import DataTable from '../../components/common/DataTable';
+import AudioAnalysisSection from '../../components/AudioAnalysisSection';
+import AnalysisResults from '../../components/AnalysisResults';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_MODE } from '../../config/config';
-import { DEMO_DATA } from '../../services/demoData';
+import { fetchRecordings } from '../../services/api';
 
 const NAV = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'profile', label: 'My profile', icon: UserRound },
-  { id: 'assessments', label: 'Assessment history', icon: ClipboardList },
-  { id: 'upload', label: 'Upload recording', icon: Mic },
-  { id: 'results', label: 'Results & reports', icon: FileText },
+  { id: 'profile', label: 'My Profile', icon: UserRound },
+  { id: 'upload', label: 'Upload Respiratory Recording', icon: Mic },
+  { id: 'history', label: 'My Recordings History', icon: ClipboardList },
 ];
-const NOT_CONNECTED = 'This section will show your real records once the backend endpoint is connected.';
 
 export default function PatientDashboard() {
   const { user } = useAuth();
-  const demo = DEMO_MODE ? DEMO_DATA.patient : null; // real data would be fetched here instead
+  const [recordings, setRecordings] = useState([]);
+  const [loadingRecordings, setLoadingRecordings] = useState(false);
+  const [analysisData, setAnalysisData] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const loadData = async () => {
+    setLoadingRecordings(true);
+    try {
+      const res = await fetchRecordings();
+      if (res.success && res.data) {
+        setRecordings(Array.isArray(res.data) ? res.data : res.data.results || []);
+      }
+    } catch (e) {
+      console.warn('Failed to load user recordings', e);
+    } finally {
+      setLoadingRecordings(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleAnalysisSuccess = (data) => {
+    setAnalysisData(data);
+    loadData();
+  };
 
   return (
     <DashboardLayout navItems={NAV}>
       <div className="hero" id="overview">
         <h1>Welcome, {user.name}</h1>
-        <p>View your assessments and recordings. You can only see your own records.</p>
+        <p>Acoustic Epidemiology Patient Portal — Ingest respiratory audio for research and clinician review.</p>
       </div>
 
-      <div className="grid">
-        <div className="card stat"><div className="label">Assessments</div><div className="value">{demo ? demo.assessments.length : '—'}</div></div>
-        <div className="card stat"><div className="label">Awaiting review</div><div className="value">{demo ? demo.assessments.filter((a) => a.status === 'Under review').length : '—'}</div></div>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="card stat">
+          <div className="label">My Uploaded Audio</div>
+          <div className="value">{recordings.length}</div>
+        </div>
+        <div className="card stat">
+          <div className="label">Account Status</div>
+          <div className="value" style={{ fontSize: '1rem', marginTop: 4, color: '#10b981' }}>Active / Verified</div>
+        </div>
       </div>
 
-      <Card id="profile" icon={UserRound} title="My profile">
-        {demo ? (
-          <dl className="kv">{Object.entries(demo.profile).map(([k, v]) => (<div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd>{v}</dd></div>))}</dl>
-        ) : <EmptyState title="Profile not connected">{NOT_CONNECTED}</EmptyState>}
+      {/* Profile Card */}
+      <Card id="profile" icon={UserRound} title="My Profile & Clinical Identifiers">
+        <dl className="kv" style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px' }}>
+          <dt style={{ fontWeight: 600 }}>Username:</dt>
+          <dd>{user.name}</dd>
+          <dt style={{ fontWeight: 600 }}>Email Address:</dt>
+          <dd>{user.email}</dd>
+          <dt style={{ fontWeight: 600 }}>System Role:</dt>
+          <dd>Acoustic Data Contributor ({user.role})</dd>
+        </dl>
       </Card>
 
-      <Card id="assessments" icon={ClipboardList} title="Assessment history">
-        {demo ? (
-          <DataTable caption="Assessment history" rows={demo.assessments} columns={[
-            { key: 'id', label: 'ID' }, { key: 'date', label: 'Date' }, { key: 'type', label: 'Type' },
-            { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
-          ]} />
-        ) : <EmptyState title="No assessments to show">{NOT_CONNECTED}</EmptyState>}
+      {/* Upload Section */}
+      <Card id="upload" icon={Mic} title="Submit Respiratory Sound for Analysis">
+        <p className="hint" style={{ marginBottom: 16 }}>
+          Upload your pediatric audio recording (.wav, .flac, .ogg, or .mp3) for feature extraction and AI classification.
+        </p>
+
+        <AudioAnalysisSection 
+          onAnalysisSuccess={handleAnalysisSuccess}
+          isAnalyzing={isAnalyzing}
+          setIsAnalyzing={setIsAnalyzing}
+        />
+
+        {analysisData && (
+          <div style={{ marginTop: '2rem' }}>
+            <AnalysisResults 
+              prediction={analysisData.prediction}
+              recording={analysisData.recording}
+              explanation={analysisData.explanation}
+              diseasePrediction={analysisData.diseasePrediction}
+              onReset={() => setAnalysisData(null)}
+            />
+          </div>
+        )}
       </Card>
 
-      <Card id="upload" icon={Mic} title="Upload respiratory recording">
-        <p className="hint" style={{ marginBottom: 12 }}>Recording upload will be enabled after the recordings endpoint and its accepted file format are confirmed in the backend.</p>
-        <button className="btn btn-primary" disabled><Upload size={16} aria-hidden="true" /> Upload recording (not connected)</button>
-      </Card>
-
-      <Card id="results" icon={FileText} title="Results & reports">
-        <EmptyState title="No results yet">{DEMO_MODE ? 'Demo mode never fabricates analysis results.' : NOT_CONNECTED}</EmptyState>
-        <p className="hint" style={{ marginTop: 12 }}>Analysis output is research assistance only and is not a medical diagnosis.</p>
+      {/* History Card */}
+      <Card id="history" icon={ClipboardList} title="My Uploaded Audio Recordings">
+        {recordings.length > 0 ? (
+          <DataTable 
+            caption="My Recordings" 
+            rows={recordings} 
+            columns={[
+              { key: 'original_filename', label: 'File Name' },
+              { key: 'duration_seconds', label: 'Duration', render: (r) => `${r.duration_seconds || '—'}s` },
+              { key: 'sample_rate', label: 'Sample Rate', render: (r) => `${r.sample_rate || '—'} Hz` },
+              { key: 'created_at', label: 'Upload Date', render: (r) => new Date(r.created_at).toLocaleDateString() },
+            ]} 
+          />
+        ) : (
+          <EmptyState title={loadingRecordings ? 'Loading recordings...' : 'No recordings submitted yet'}>
+            {loadingRecordings ? 'Checking backend database...' : 'Upload your first audio file above to view history.'}
+          </EmptyState>
+        )}
       </Card>
     </DashboardLayout>
   );

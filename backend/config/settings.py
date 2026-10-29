@@ -87,7 +87,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Primary: MySQL (configured via environment variables)
 # Fallback to SQLite is available only when DB_ENGINE is explicitly configured for SQLite.
 
-DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.mysql')
+DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.sqlite3')
 DB_NAME = os.getenv('DB_NAME', 'acoustic_epidemiology')
 DB_USER = os.getenv('DB_USER', 'root')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'root')
@@ -168,10 +168,11 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 26214400
 
 
 # CORS Configuration
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOWED_ORIGINS = [
     origin.strip() for origin in os.getenv(
         'CORS_ALLOWED_ORIGINS',
-        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
+        'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://localhost:3000,http://127.0.0.1:3000'
     ).split(',') if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True

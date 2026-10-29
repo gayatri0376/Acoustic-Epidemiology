@@ -27,7 +27,7 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-MODEL_PATH = PROJECT_ROOT / "ml" / "models" / "saved_models" / "sprsound-disease-cnn-v1.keras"
+MODEL_PATH = PROJECT_ROOT / "ml" / "models" / "saved_models" / "sprsound-disease-cnn-v2.keras"
 MANIFEST_PATH = PROJECT_ROOT / "ml" / "features" / "extracted" / "disease_split_manifest.csv"
 CONFIG_PATH = PROJECT_ROOT / "ml" / "models" / "saved_models" / "sprsound-disease-cnn-v1_config.json"
 OUTPUT_PATH = PROJECT_ROOT / "ml" / "evaluation" / "reports" / "disease_model_validation_fold0_evaluation.json"

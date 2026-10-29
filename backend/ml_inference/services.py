@@ -7,6 +7,7 @@ from django.conf import settings
 from rest_framework.exceptions import APIException
 from rest_framework import status
 from ml_inference.models import ModelVersion, ModelStatus, Prediction, PredictionStatus
+from ml_inference.disease_service import DiseaseInferenceService
 
 logger = logging.getLogger(__name__)
 

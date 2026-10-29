@@ -12,9 +12,26 @@ export class ApiError extends Error {
   }
 }
 
-// Token mode only: the token lives in memory (not localStorage), so it is lost on refresh.
-let accessToken = null;
-export const setAccessToken = (t) => { accessToken = t; };
+let accessToken = typeof window !== 'undefined' ? localStorage.getItem('ae_access_token') : null;
+export const setAccessToken = (t) => {
+  accessToken = t;
+  if (typeof window !== 'undefined') {
+    if (t) localStorage.setItem('ae_access_token', t);
+    else localStorage.removeItem('ae_access_token');
+  }
+};
+
+export function getAuthHeaders(explicitToken = null, isMultipart = false) {
+  const activeToken = explicitToken || (typeof window !== 'undefined' ? localStorage.getItem('ae_access_token') : null) || accessToken;
+  const headers = { Accept: 'application/json' };
+  if (!isMultipart) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (activeToken) {
+    headers.Authorization = `Token ${activeToken}`;
+  }
+  return headers;
+}
 
 // Called when the server answers 401 for a signed-in user (expired session).
 let onUnauthorized = null;
@@ -76,7 +93,7 @@ export async function apiRequest(path, { method = 'GET', body, auth = true } = {
   }
   return data;
 }
-<<<<<<< HEAD
+
 
 /**
  * Retrieves the documented API endpoint catalog via GET /api/v1/
@@ -352,5 +369,64 @@ export async function submitAssessment(predictionId, assessmentData, token) {
 }
 
 export { API_BASE_URL };
-=======
->>>>>>> c882e3b4a4911c3b7380c1be5b04e403e0abfafe
+
+// =======================================================================
+// Disease Prediction API (Model B — separate from sound classification)
+// =======================================================================
+
+/**
+ * Requests disease-model inference for a recording.
+ * POST /api/v1/recordings/<recordingId>/predict-disease/
+ *
+ * Returns disease screening output (Healthy Control / Pneumonia / Wheezing Disorders)
+ * from the SPRSound-trained disease CNN model.
+ *
+ * Handles HTTP 503 (Disease Model Unavailable) cleanly.
+ */
+export async function requestDiseasePrediction(recordingId, token) {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/recordings/${recordingId}/predict-disease/`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+    });
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      statusCode: response.status,
+      isDiseaseModelUnavailable: response.status === 503 || response.status === 500,
+      errorMessage: response.ok ? null : (data.error || data.detail || data.message || 'Disease inference request failed'),
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message,
+      isDiseaseModelUnavailable: true,
+      errorMessage: `Network error connecting to disease inference endpoint: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Fetches the currently active disease model from the registry.
+ * GET /api/v1/models/disease/active/
+ */
+export async function fetchActiveDiseaseModel() {
+  const url = `${API_BASE_URL.replace(/\/+$/, '')}/api/v1/models/disease/active/`;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+    });
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      statusCode: response.status,
+      isDiseaseModelDeployed: response.ok,
+    };
+  } catch (err) {
+    return { success: false, error: err.message, isDiseaseModelDeployed: false };
+  }
+}

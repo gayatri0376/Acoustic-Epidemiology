@@ -12,7 +12,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import AudioPlayer from './AudioPlayer';
-import { uploadAudioRecording, requestPrediction, requestExplanation } from '../services/api';
+import { uploadAudioRecording, requestPrediction, requestExplanation, requestDiseasePrediction } from '../services/api';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 const ALLOWED_EXTENSIONS = ['.wav', '.flac', '.ogg', '.mp3'];
@@ -146,14 +146,16 @@ export default function AudioAnalysisSection({
       return;
     }
 
-    if (!token) {
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('ae_access_token') : null);
+
+    if (!activeToken) {
       setServerError({
         type: 'auth',
         title: 'Authentication Required',
         message: 'Uploading and analyzing recordings requires an authorized API session.',
         action: 'Sign in to continue',
       });
-      onRequireAuth();
+      if (onRequireAuth) onRequireAuth();
       return;
     }
 
@@ -173,7 +175,7 @@ export default function AudioAnalysisSection({
         formData.append('patient_age_group', patientAgeGroup);
       }
 
-      const uploadRes = await uploadAudioRecording(formData, token);
+      const uploadRes = await uploadAudioRecording(formData, activeToken);
 
       if (!uploadRes.success) {
         setIsAnalyzing(false);
@@ -214,7 +216,7 @@ export default function AudioAnalysisSection({
 
       // Step 2: Request CNN Inference
       setAnalysisPhase('predicting');
-      const predictRes = await requestPrediction(recordingId, token);
+      const predictRes = await requestPrediction(recordingId, activeToken);
 
       if (!predictRes.success) {
         setIsAnalyzing(false);
@@ -252,7 +254,7 @@ export default function AudioAnalysisSection({
       let explanationError = null;
 
       try {
-        const explRes = await requestExplanation(predictionData.id, token, 'GRAD_CAM');
+        const explRes = await requestExplanation(predictionData.id, activeToken, 'GRAD_CAM');
         if (explRes.success) {
           explanationData = explRes.data;
         } else {
@@ -260,6 +262,22 @@ export default function AudioAnalysisSection({
         }
       } catch (explErr) {
         explanationError = `Explanation request error: ${explErr.message}`;
+      }
+
+      // Step 4: Request Disease Model Prediction (Model B — separate from sound classification)
+      setAnalysisPhase('disease');
+      let diseasePredictionData = null;
+      let diseaseError = null;
+
+      try {
+        const diseaseRes = await requestDiseasePrediction(recordingId, activeToken);
+        if (diseaseRes.success) {
+          diseasePredictionData = diseaseRes.data;
+        } else {
+          diseaseError = diseaseRes.errorMessage || 'Disease model is not currently deployed.';
+        }
+      } catch (diseaseErr) {
+        diseaseError = `Disease prediction error: ${diseaseErr.message}`;
       }
 
       // Complete!
@@ -271,6 +289,8 @@ export default function AudioAnalysisSection({
         prediction: predictionData,
         explanation: explanationData,
         explanationError,
+        diseasePrediction: diseasePredictionData,
+        diseaseError,
       });
 
     } catch (err) {
@@ -554,13 +574,17 @@ export default function AudioAnalysisSection({
                 <span className="step-dot"></span>
                 <span>1. Uploading &amp; validating audio stream header and sample rate</span>
               </div>
-              <div className={`progress-step-item ${analysisPhase === 'predicting' ? 'step-active' : analysisPhase === 'explaining' ? 'step-done' : 'step-pending'}`}>
+              <div className={`progress-step-item ${analysisPhase === 'predicting' ? 'step-active' : analysisPhase === 'explaining' || analysisPhase === 'disease' ? 'step-done' : 'step-pending'}`}>
                 <span className="step-dot"></span>
-                <span>2. Computing 2D Mel-Spectrogram &amp; executing 2D-CNN forward pass</span>
+                <span>2. Computing 2D Mel-Spectrogram &amp; executing sound-classification CNN</span>
               </div>
-              <div className={`progress-step-item ${analysisPhase === 'explaining' ? 'step-active' : 'step-pending'}`}>
+              <div className={`progress-step-item ${analysisPhase === 'explaining' ? 'step-active' : analysisPhase === 'disease' ? 'step-done' : 'step-pending'}`}>
                 <span className="step-dot"></span>
                 <span>3. Backpropagating convolutional gradients for Grad-CAM saliency</span>
+              </div>
+              <div className={`progress-step-item ${analysisPhase === 'disease' ? 'step-active' : 'step-pending'}`}>
+                <span className="step-dot"></span>
+                <span>4. Executing disease-screening CNN forward pass</span>
               </div>
             </div>
           </div>

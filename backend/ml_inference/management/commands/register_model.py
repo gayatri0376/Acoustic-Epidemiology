@@ -379,12 +379,19 @@ class Command(BaseCommand):
         # 6. Activation Safety Handling
         if status_choice == ModelStatus.ACTIVE.value:
             if deactivate_others and not dry_run:
-                active_count = ModelVersion.objects.filter(status=ModelStatus.ACTIVE.value).count()
+                from ml_inference.models import ModelTaskType
+                active_count = ModelVersion.objects.filter(
+                    status=ModelStatus.ACTIVE.value,
+                    task_type=ModelTaskType.SOUND_CLASSIFICATION
+                ).count()
                 if active_count > 0:
-                    ModelVersion.objects.filter(status=ModelStatus.ACTIVE.value).update(
+                    ModelVersion.objects.filter(
+                        status=ModelStatus.ACTIVE.value,
+                        task_type=ModelTaskType.SOUND_CLASSIFICATION
+                    ).update(
                         status=ModelStatus.RETIRED.value
                     )
-                    self.stdout.write(f"  [✓] Retired {active_count} previously active model(s).")
+                    self.stdout.write(f"  [✓] Retired {active_count} previously active SOUND_CLASSIFICATION model(s).")
 
         # 7. Model Instance Construction & Django full_clean() Validation
         if existing:

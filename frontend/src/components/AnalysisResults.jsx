@@ -2,353 +2,180 @@ import React from 'react';
 import { 
   CheckCircle2, 
   RotateCcw, 
-  FileAudio, 
-  Clock, 
-  Layers, 
   Eye, 
-  Info, 
-  AlertTriangle, 
   BarChart3,
-  Sliders
+  Stethoscope,
+  Activity,
+  Layers
 } from 'lucide-react';
-import { getCategoryDetails } from '../utils/clinicalCategories';
 import { API_BASE_URL } from '../services/api';
-
-function formatBytes(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-}
 
 export default function AnalysisResults({ 
   prediction, 
   recording, 
   explanation, 
   explanationError,
+  diseasePrediction,
   onReset 
 }) {
-  if (!prediction && !recording) return null;
+  if (!prediction && !recording && !diseasePrediction) return null;
 
-  const predictedClass = prediction?.predicted_class || 'Pending Classification';
-  const categoryInfo = getCategoryDetails(predictedClass);
+  const predictedClass = prediction?.predicted_class || 'Unknown';
   const probScores = prediction?.probability_scores || null;
-  const hasProbabilities = probScores && Object.keys(probScores).length > 0;
 
-  // Resolve Grad-CAM artifact URL safely
+  const predictedDisease = diseasePrediction?.predicted_disease || 'Screening In Progress';
+  const diseaseProbs = diseasePrediction?.probability_scores || null;
+
+  // Grad-CAM artifact image URL
   const gradCamArtifactUrl = explanation?.artifact_path
     ? `${API_BASE_URL.replace(/\/+$/, '')}/${explanation.artifact_path.replace(/^\/+/, '')}`
     : null;
 
   return (
-    <section className="results-container glass-panel" id="analysis-results">
-      {/* Results Header */}
-      <div className="results-header">
-        <div className="results-header-left">
-          <span className="badge badge-emerald">
-            <CheckCircle2 size={14} /> Diagnostic Acoustic Evaluation
+    <section className="results-container glass-panel" id="analysis-results" style={{ padding: '1.5rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+            AI Prediction Results
+          </h2>
+          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+            Audio: {recording?.original_filename || 'Recording'}
           </span>
-          <h2 className="results-title">Auscultation Analysis Results</h2>
-          <p className="results-subtitle">
-            Feature extraction, deep convolutional pattern classification, and Grad-CAM interpretability.
-          </p>
         </div>
 
         <button 
           type="button" 
           onClick={onReset} 
-          className="btn-secondary results-reset-btn"
-          id="btn-analyze-another-top"
+          className="btn btn-secondary"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          <RotateCcw size={15} /> Analyze Another Recording
+          <RotateCcw size={15} /> Analyze Another
         </button>
       </div>
 
-      {/* Main Prediction Banner Card */}
-      <div className="prediction-banner-card">
-        <div className="prediction-banner-top">
-          <div className="prediction-category-group">
-            <span className="prediction-label-prefix">Predicted Respiratory Category</span>
-            <div className="prediction-category-title-row">
-              <h3 className="prediction-category-name">{categoryInfo?.label || predictedClass}</h3>
-              <span className={`badge ${categoryInfo?.badgeClass || 'badge-cyan'} text-sm`}>
-                {predictedClass}
-              </span>
-            </div>
+      {/* Grid: Model A & Model B Predictions */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        
+        {/* Model A: Sound Classification */}
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', background: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#0284c7' }}>
+            <Activity size={18} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Model A: Sound Category
+            </span>
           </div>
 
-          {prediction?.inference_duration_ms !== undefined && prediction?.inference_duration_ms !== null && (
-            <div className="prediction-latency-badge font-mono">
-              <Clock size={13} /> {prediction.inference_duration_ms} ms forward pass
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
+            {predictedClass}
+          </div>
+
+          {/* Probabilities */}
+          {probScores && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {Object.entries(probScores).map(([clsName, score]) => {
+                const numericScore = typeof score === 'number' ? score : parseFloat(score) || 0;
+                const percent = Math.round(numericScore * 100);
+                const isTop = clsName === predictedClass;
+
+                return (
+                  <div key={clsName}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: isTop ? 700 : 500, color: isTop ? '#0f172a' : '#64748b', marginBottom: '3px' }}>
+                      <span>{clsName}</span>
+                      <span className="font-mono">{percent}%</span>
+                    </div>
+                    <div style={{ height: '7px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div 
+                        style={{ 
+                          width: `${percent}%`, 
+                          height: '100%', 
+                          background: isTop ? '#0284c7' : '#cbd5e1', 
+                          borderRadius: '4px',
+                          transition: 'width 0.4s ease'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Plain-English Clinical Explanation */}
-        <div className="prediction-explanation-box">
-          <div className="explanation-icon-col">
-            <Info size={18} className="text-cyan" />
-          </div>
-          <div className="explanation-text-content">
-            <div className="explanation-lead font-semibold">Clinical Acoustic Interpretation</div>
-            <p className="explanation-body">
-              {categoryInfo?.clinicalSummary || 'Acoustic pattern evaluated against pediatric auscultation dataset.'}
-            </p>
-            <div className="acoustic-props-row">
-              <div className="acoustic-prop-item">
-                <span className="prop-name">Sound Profile:</span>
-                <span className="prop-val">{categoryInfo?.soundType || 'Acoustic signal'}</span>
-              </div>
-              <div className="acoustic-prop-item">
-                <span className="prop-name">Typical Duration:</span>
-                <span className="prop-val">{categoryInfo?.duration || 'Variable'}</span>
-              </div>
-              <div className="acoustic-prop-item">
-                <span className="prop-name">Bandpass Spectrum:</span>
-                <span className="prop-val">{categoryInfo?.frequencyRange || '50 Hz – 2000 Hz'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Class Probabilities Distribution (Rendered ONLY if returned by backend) */}
-      {hasProbabilities && (
-        <div className="results-subcard">
-          <div className="subcard-header">
-            <div className="subcard-title-group">
-              <BarChart3 size={18} className="text-cyan" />
-              <h4 className="subcard-title">Class Softmax Probabilities</h4>
-            </div>
-            <span className="subcard-hint">
-              Output scores returned directly from active CNN softmax head
+        {/* Model B: Respiratory Disease Prediction */}
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', background: '#faf5ff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#7c3aed' }}>
+            <Stethoscope size={18} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Model B: Disease Prediction
             </span>
           </div>
 
-          <div className="probability-bars-grid">
-            {Object.entries(probScores).map(([clsName, score]) => {
-              const numericScore = typeof score === 'number' ? score : parseFloat(score) || 0;
-              const percent = Math.round(numericScore * 100);
-              const isTop = clsName === predictedClass;
-              const itemCategory = getCategoryDetails(clsName);
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
+            {predictedDisease}
+          </div>
 
-              return (
-                <div 
-                  key={clsName} 
-                  className={`probability-item ${isTop ? 'probability-item-top' : ''}`}
-                >
-                  <div className="prob-label-row">
-                    <span className="prob-class-name">
-                      {clsName}
-                      {isTop && <span className="top-indicator">Predicted</span>}
-                    </span>
-                    <span className="prob-percentage font-mono">{percent}%</span>
-                  </div>
+          {/* Probabilities */}
+          {diseaseProbs ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {Object.entries(diseaseProbs).map(([dName, score]) => {
+                const numericScore = typeof score === 'number' ? score : parseFloat(score) || 0;
+                const percent = Math.round(numericScore * 100);
+                const isTop = dName === predictedDisease;
 
-                  <div className="prob-progress-track">
-                    <div 
-                      className={`prob-progress-fill ${isTop ? 'fill-accent' : 'fill-muted'}`}
-                      style={{ 
-                        width: `${Math.max(percent, 2)}%`,
-                        backgroundColor: isTop ? itemCategory?.themeColor : undefined 
-                      }}
-                    />
+                let barColor = '#7c3aed';
+                if (dName.toLowerCase().includes('healthy')) barColor = '#10b981';
+                else if (dName.toLowerCase().includes('pneumonia')) barColor = '#ef4444';
+                else if (dName.toLowerCase().includes('wheez')) barColor = '#f59e0b';
+
+                return (
+                  <div key={dName}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: isTop ? 700 : 500, color: isTop ? '#0f172a' : '#64748b', marginBottom: '3px' }}>
+                      <span>{dName}</span>
+                      <span className="font-mono">{percent}%</span>
+                    </div>
+                    <div style={{ height: '7px', background: '#e9d5ff', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div 
+                        style={{ 
+                          width: `${percent}%`, 
+                          height: '100%', 
+                          background: isTop ? barColor : '#cbd5e1', 
+                          borderRadius: '4px',
+                          transition: 'width 0.4s ease'
+                        }} 
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Evaluating disease probability scores...</div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Visual Interpretability (Heatmap) */}
+      {gradCamArtifactUrl && (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.5rem', background: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem', color: '#0f172a', fontWeight: 600, fontSize: '0.95rem' }}>
+            <Eye size={18} color="#d97706" />
+            <span>Grad-CAM Time-Frequency Saliency Heatmap</span>
+          </div>
+          <div style={{ textAlign: 'center', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <img 
+              src={gradCamArtifactUrl} 
+              alt={`Grad-CAM heatmap for ${predictedClass}`} 
+              style={{ maxWidth: '100%', maxHeight: '280px', objectFit: 'contain', borderRadius: '6px' }} 
+            />
           </div>
         </div>
       )}
 
-      {/* Technical Recording Details Grid */}
-      {recording && (
-        <div className="results-subcard">
-          <div className="subcard-header">
-            <div className="subcard-title-group">
-              <FileAudio size={18} className="text-cyan" />
-              <h4 className="subcard-title">Audio Stream Properties</h4>
-            </div>
-            <span className="subcard-hint">
-              Validated acoustic parameters stored in database
-            </span>
-          </div>
-
-          <div className="metadata-metrics-grid">
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">Original Filename</span>
-              <span className="meta-metric-value font-mono text-ellipsis" title={recording.original_filename}>
-                {recording.original_filename || 'Audio Recording'}
-              </span>
-            </div>
-
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">Duration</span>
-              <span className="meta-metric-value font-mono">
-                {recording.duration_seconds ? `${recording.duration_seconds} s` : 'N/A'}
-              </span>
-            </div>
-
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">Sampling Rate</span>
-              <span className="meta-metric-value font-mono">
-                {recording.sample_rate ? `${recording.sample_rate} Hz` : 'N/A'}
-              </span>
-            </div>
-
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">Channels</span>
-              <span className="meta-metric-value font-mono">
-                {recording.channels === 1 ? 'Mono (1 Ch)' : recording.channels === 2 ? 'Stereo (2 Ch)' : `${recording.channels} Ch`}
-              </span>
-            </div>
-
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">File Size</span>
-              <span className="meta-metric-value font-mono">
-                {formatBytes(recording.file_size_bytes)}
-              </span>
-            </div>
-
-            <div className="meta-metric-card">
-              <span className="meta-metric-label">Format Signature</span>
-              <span className="meta-metric-value font-mono uppercase">
-                {recording.file_format || 'WAV'}
-              </span>
-            </div>
-
-            {recording.anatomical_location && (
-              <div className="meta-metric-card">
-                <span className="meta-metric-label">Anatomical Location</span>
-                <span className="meta-metric-value">
-                  {recording.anatomical_location_display || recording.anatomical_location}
-                </span>
-              </div>
-            )}
-
-            {recording.patient_age_group && (
-              <div className="meta-metric-card">
-                <span className="meta-metric-label">Patient Age Group</span>
-                <span className="meta-metric-value">
-                  {recording.patient_age_group_display || recording.patient_age_group}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Visualizations: Mel-Spectrogram & Grad-CAM Heatmap */}
-      <div className="results-visualizations-row">
-        {/* Mel-Spectrogram Panel */}
-        <div className="visualization-card">
-          <div className="viz-card-header">
-            <div className="viz-card-title-group">
-              <Sliders size={18} className="text-cyan" />
-              <h4 className="viz-card-title">Time-Frequency Mel-Spectrogram</h4>
-            </div>
-            <span className="badge badge-cyan text-xs">Acoustic Feature</span>
-          </div>
-
-          <div className="viz-card-body">
-            {recording?.spectrogram_url ? (
-              <div className="viz-image-wrapper">
-                <img 
-                  src={recording.spectrogram_url} 
-                  alt="Mel-Spectrogram visualization" 
-                  className="viz-image"
-                />
-              </div>
-            ) : (
-              <div className="viz-status-banner">
-                <div className="viz-status-icon">
-                  <Layers size={24} className="text-cyan" />
-                </div>
-                <div className="viz-status-text">
-                  <div className="viz-status-heading">In-Memory Preprocessing Active</div>
-                  <p className="viz-status-desc">
-                    Raw auscultation waveforms are filtered with a 5th-order Butterworth bandpass (50–2000 Hz) 
-                    and transformed into 128 Mel-frequency bins internally for the 2D-CNN input tensor. 
-                    Image export is not configured on this endpoint.
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            <div className="viz-spec-specs font-mono">
-              <span>n_mels: 128</span>
-              <span>n_fft: 1024</span>
-              <span>hop_length: 512</span>
-              <span>f_min: 50 Hz</span>
-              <span>f_max: 2000 Hz</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Grad-CAM Saliency Heatmap Panel */}
-        <div className="visualization-card">
-          <div className="viz-card-header">
-            <div className="viz-card-title-group">
-              <Eye size={18} className="text-amber" />
-              <h4 className="viz-card-title">Grad-CAM Saliency Explanation</h4>
-            </div>
-            <span className="badge badge-amber text-xs">Explainable AI</span>
-          </div>
-
-          <div className="viz-card-body">
-            {gradCamArtifactUrl ? (
-              <div className="viz-image-wrapper">
-                <img 
-                  src={gradCamArtifactUrl} 
-                  alt={`Grad-CAM heatmap for ${predictedClass}`} 
-                  className="viz-image"
-                />
-                <div className="viz-image-caption">
-                  <span>Target Class: <strong className="font-mono">{predictedClass}</strong></span>
-                  {explanation?.structured_data?.conv_layer && (
-                    <span>Layer: <code className="inline-code">{explanation.structured_data.conv_layer}</code></span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="viz-status-banner viz-status-banner-warning">
-                <div className="viz-status-icon">
-                  <AlertTriangle size={24} className="text-amber" />
-                </div>
-                <div className="viz-status-text">
-                  <div className="viz-status-heading">Grad-CAM Artifact Status</div>
-                  <p className="viz-status-desc">
-                    {explanationError || explanation?.error_details || (
-                      "Grad-CAM requires access to the trained convolutional layers and weights of the CNN model. Authentic saliency heatmaps are generated only from backpropagated convolutional gradients and are never synthesized."
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="interpretability-disclaimer">
-              <Info size={14} className="shrink-0 text-cyan mt-0.5" />
-              <span>
-                Grad-CAM highlights time-frequency regions in the Mel-Spectrogram that contributed 
-                most heavily to the model's classification. It is an algorithmic interpretability tool 
-                and does not constitute medical advice or clinical diagnosis.
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Action Section */}
-      <div className="results-footer-actions">
-        <button 
-          type="button" 
-          onClick={onReset} 
-          className="btn-primary"
-          id="btn-analyze-another-bottom"
-        >
-          <RotateCcw size={16} /> Analyze Another Recording
-        </button>
+      {/* Bottom Minimal Notice */}
+      <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
+        Research-assistance predictions only. Not a medical diagnosis.
       </div>
     </section>
   );

@@ -11,10 +11,14 @@ const DEMO_KEY = 'ae_demo_user'; // demo only: synthetic user, never a real cred
 // The role must come from the server's response, never from the login form.
 export function normalizeUser(data) {
   const u = data?.user ?? data;
-  const role = String(u?.role ?? '').toLowerCase();
+  let role = String(u?.role ?? u?.profile?.role ?? '').toLowerCase();
+  if (role === 'clinician' || role === 'researcher') role = 'doctor';
+  if (role === 'administrator') role = 'admin';
+  if (role === 'uploader') role = 'patient';
+
   if (!ROLES.includes(role)) {
     throw new ApiError(
-      'The server response did not include a recognised role (patient, doctor or admin). Update normalizeUser() in authService.js.',
+      `The server response role "${role}" is not recognised (patient, doctor or admin).`,
       { kind: 'config' },
     );
   }

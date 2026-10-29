@@ -23,6 +23,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -32,9 +33,21 @@ class UserSerializer(serializers.ModelSerializer):
             'email',
             'first_name',
             'last_name',
+            'role',
             'profile',
         ]
         read_only_fields = ['id']
+
+    def get_role(self, obj):
+        profile = getattr(obj, 'profile', None)
+        if not profile:
+            return 'admin' if (obj.is_staff or obj.is_superuser) else 'patient'
+        r = profile.role
+        if r in (UserRole.CLINICIAN, UserRole.RESEARCHER):
+            return 'doctor'
+        elif r == UserRole.ADMINISTRATOR or obj.is_superuser:
+            return 'admin'
+        return 'patient'
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -86,5 +99,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
+    username = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs):
+        username = attrs.get('username') or attrs.get('email')
+        if not username:
+            raise serializers.ValidationError({"email": "Username or email is required."})
+        attrs['username'] = username
+        return attrs

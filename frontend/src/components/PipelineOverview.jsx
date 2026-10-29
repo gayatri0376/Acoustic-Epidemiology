@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-  Sliders, 
-  Filter, 
-  BrainCircuit, 
-  Eye, 
+import {
+  Sliders,
+  Filter,
+  BrainCircuit,
+  Eye,
   AudioWaveform,
   Sparkles
 } from 'lucide-react';
