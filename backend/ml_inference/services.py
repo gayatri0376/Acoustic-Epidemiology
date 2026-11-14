@@ -130,22 +130,24 @@ class AudioPreprocessor:
         f_max=2000.0,
         to_db=True,
         apply_bandpass=False,
-        normalization=None
+        normalization=None,
+        top_db=80.0,
+        filter_order=5
     ):
         """
         Generates 2D Mel-Spectrogram energy distribution from 1D temporal pressure wave.
-        Supports optional zero-phase Butterworth bandpass and min-max normalization.
+        Supports zero-phase Butterworth bandpass, decibel scaling, and min-max normalization.
         """
-        # Optional 5th-order Butterworth bandpass filter
+        # Optional zero-phase Butterworth bandpass filter
         if apply_bandpass:
             try:
                 import scipy.signal
                 nyquist = sr / 2.0
                 low = max(0.001, f_min / nyquist)
                 high = min(0.999, f_max / nyquist)
-                padlen = 30
+                padlen = 3 * (2 * filter_order)
                 if len(audio) > padlen and low < high:
-                    sos = scipy.signal.butter(5, [low, high], btype='bandpass', output='sos')
+                    sos = scipy.signal.butter(filter_order, [low, high], btype='bandpass', output='sos')
                     audio = scipy.signal.sosfiltfilt(sos, audio).astype(np.float32)
             except Exception as exc:
                 logger.warning("Butterworth filtering failed, using unfiltered audio: %s", exc)
@@ -163,12 +165,15 @@ class AudioPreprocessor:
                 power=2.0
             )
             if to_db:
-                mel_spec = librosa.power_to_db(mel_spec, ref=np.max, top_db=80.0)
+                mel_spec = librosa.power_to_db(mel_spec, ref=np.max, top_db=top_db)
 
             if normalization == 'minmax_01':
-                mel_spec = np.clip((mel_spec + 80.0) / 80.0, 0.0, 1.0)
+                mel_spec = np.clip((mel_spec + top_db) / top_db, 0.0, 1.0)
             elif normalization == 'standard':
                 mel_spec = (mel_spec - np.mean(mel_spec)) / (np.std(mel_spec) + 1e-7)
+
+            if np.isnan(mel_spec).any() or np.isinf(mel_spec).any():
+                raise ValueError("Mel-spectrogram extraction generated NaN or infinite values.")
 
             return mel_spec.astype(np.float32)
         except ImportError:
@@ -189,19 +194,56 @@ class AudioPreprocessor:
         return 20 * np.log10(np.maximum(magnitude, 1e-6))
 
     @classmethod
+    def validate_preprocessing_config(cls, config):
+        """
+        Validates model-specific preprocessing configuration dictionary.
+        Prevents silent use of incompatible defaults and verifies required acoustic keys.
+        """
+        if config is None:
+            config = {}
+        if not isinstance(config, dict):
+            raise ValueError(f"Preprocessing configuration must be a dictionary, got {type(config).__name__}.")
+
+        required_keys = ['sample_rate', 'n_mels', 'n_fft', 'hop_length']
+        missing_keys = [k for k in required_keys if k not in config]
+        if missing_keys:
+            # If config is completely empty, provide clear guidance
+            if not config:
+                logger.warning(
+                    "Preprocessing configuration is empty. Applying fallback defaults for backward compatibility."
+                )
+            else:
+                raise ValueError(
+                    f"Model preprocessing configuration error: Missing required parameter(s): {', '.join(missing_keys)}. "
+                    "A model must explicitly define its verified acoustic feature settings."
+                )
+
+        if 'normalization' in config and config['normalization'] not in ('minmax_01', 'standard', 'none', None):
+            raise ValueError(
+                f"Invalid normalization method '{config['normalization']}'. "
+                "Supported methods: 'minmax_01', 'standard', 'none', or null."
+            )
+
+        return config
+
+    @classmethod
     def prepare_cnn_input(cls, audio_path, config=None, expected_shape=None):
         """
         Orchestrates full feature extraction, dimension validation, and tensor formatting.
+        Enforces model-specific configuration and rejects invalid numerical values.
         """
-        config = config or {}
-        target_sr = config.get('sample_rate', 16000)
-        n_mels = config.get('n_mels', 128)
-        n_fft = config.get('n_fft', 1024)
-        hop_length = config.get('hop_length', 512)
-        f_min = config.get('f_min', 50.0)
-        f_max = config.get('f_max', 2000.0)
-        apply_bandpass = config.get('apply_bandpass', False)
-        normalization = config.get('normalization', None)
+        validated_config = cls.validate_preprocessing_config(config)
+
+        target_sr = validated_config.get('sample_rate', 16000)
+        n_mels = validated_config.get('n_mels', 128)
+        n_fft = validated_config.get('n_fft', 1024)
+        hop_length = validated_config.get('hop_length', 512)
+        f_min = validated_config.get('f_min', 50.0)
+        f_max = validated_config.get('f_max', 2000.0)
+        apply_bandpass = validated_config.get('apply_bandpass', False)
+        normalization = validated_config.get('normalization', None)
+        top_db = validated_config.get('top_db', 80.0)
+        filter_order = validated_config.get('filter_order', 5)
 
         # 1. Load audio
         audio, sr = cls.load_audio(audio_path, target_sr=target_sr)
@@ -219,7 +261,9 @@ class AudioPreprocessor:
             f_max=f_max,
             to_db=True,
             apply_bandpass=apply_bandpass,
-            normalization=normalization
+            normalization=normalization,
+            top_db=top_db,
+            filter_order=filter_order
         )
 
         # 3. Add batch and channel dimensions for 2D-CNN: (batch, height, width, channels)
@@ -244,6 +288,13 @@ class AudioPreprocessor:
                     # Center-crop time dimension
                     crop_start = (current_w - target_w) // 2
                     input_tensor = input_tensor[:, :, crop_start:crop_start + target_w, :]
+
+        # 5. Numerical integrity and dimension validation
+        if input_tensor.ndim != 4:
+            raise ValueError(f"Input tensor dimension error: expected 4D tensor, got shape {input_tensor.shape}.")
+
+        if np.isnan(input_tensor).any() or np.isinf(input_tensor).any():
+            raise ValueError("Preprocessed input tensor contains NaN or Inf values.")
 
         return input_tensor.astype(np.float32)
 

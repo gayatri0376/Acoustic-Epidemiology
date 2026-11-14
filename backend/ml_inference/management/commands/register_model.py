@@ -204,8 +204,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--sample-rate",
             type=int,
-            default=16000,
-            help="Audio sampling rate in Hz (default: 16000).",
+            default=8000,
+            help="Audio sampling rate in Hz (default: 8000 for SPRSound).",
         )
         parser.add_argument(
             "--n-mels",
@@ -236,6 +236,37 @@ class Command(BaseCommand):
             type=float,
             default=2000.0,
             help="Maximum frequency cutoff in Hz (default: 2000.0).",
+        )
+        parser.add_argument(
+            "--filter-order",
+            type=int,
+            default=5,
+            help="Butterworth bandpass filter order (default: 5).",
+        )
+        parser.add_argument(
+            "--apply-bandpass",
+            action="store_true",
+            default=True,
+            help="Apply Butterworth bandpass filter prior to STFT (default: True).",
+        )
+        parser.add_argument(
+            "--no-bandpass",
+            action="store_false",
+            dest="apply_bandpass",
+            help="Disable Butterworth bandpass filtering.",
+        )
+        parser.add_argument(
+            "--top-db",
+            type=float,
+            default=80.0,
+            help="Dynamic range ceiling for decibel scaling (default: 80.0).",
+        )
+        parser.add_argument(
+            "--normalization",
+            type=str,
+            choices=["minmax_01", "standard", "none"],
+            default="minmax_01",
+            help="Spectrogram normalization method: 'minmax_01', 'standard', or 'none' (default: 'minmax_01').",
         )
         parser.add_argument(
             "--preprocessing-config",
@@ -326,7 +357,11 @@ class Command(BaseCommand):
             "hop_length": options["hop_length"],
             "f_min": options["f_min"],
             "f_max": options["f_max"],
+            "filter_order": options.get("filter_order", 5),
+            "apply_bandpass": options.get("apply_bandpass", True),
             "to_db": True,
+            "top_db": options.get("top_db", 80.0),
+            "normalization": options.get("normalization", "minmax_01"),
             "expected_input_shape": input_shape,
             "output_shape": output_shape,
             "output_activation": output_activation,
@@ -334,8 +369,21 @@ class Command(BaseCommand):
         if target_conv_layer:
             preprocessing_config["target_conv_layer"] = target_conv_layer
 
-        # Merge optional JSON preprocessing override
+        # Auto-merge companion training configuration file if available and no override provided
         custom_prep = options.get("preprocessing_config")
+        if not custom_prep:
+            companion_cfg = Path(resolved_path).with_name(Path(resolved_path).stem + "_config.json")
+            if companion_cfg.exists():
+                try:
+                    with open(companion_cfg, "r", encoding="utf-8") as f:
+                        loaded_companion = json.load(f)
+                    if isinstance(loaded_companion, dict) and "preprocessing_config" in loaded_companion:
+                        preprocessing_config.update(loaded_companion["preprocessing_config"])
+                        self.stdout.write(f"  [✓] Auto-merged companion training config from {companion_cfg.name}.")
+                except Exception as exc:
+                    logger.warning("Could not auto-load companion config %s: %s", companion_cfg, exc)
+
+        # Merge optional JSON preprocessing override
         if custom_prep:
             try:
                 if os.path.isfile(custom_prep):

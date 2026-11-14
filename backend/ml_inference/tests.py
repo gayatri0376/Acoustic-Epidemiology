@@ -565,4 +565,135 @@ class ModelRegistrationCommandTests(TestCase):
             self.assertIn("already exists in database", str(ctx.exception))
             self.assertIn("Specify --replace", str(ctx.exception))
 
+    def test_register_model_preserves_bandpass_and_normalization(self):
+        """Verifies register_model captures apply_bandpass, normalization, filter_order, and top_db."""
+        from unittest.mock import patch
+        from django.core.management import call_command
+        from ml_inference.models import ModelVersion
+        temp_artifact = self._create_temp_artifact("mock_bandpass_norm.keras")
+        rel_path = str(temp_artifact.relative_to(self.project_root))
+
+        mock_inspection = {
+            "input_shape": [None, 128, 128, 1],
+            "output_shape": [None, 3],
+            "output_activation": "softmax",
+        }
+
+        with patch('ml_inference.management.commands.register_model.inspect_and_validate_cnn_artifact', return_value=mock_inspection):
+            call_command(
+                'register_model',
+                '--model-version', 'pediatric-cnn-full-config-v1',
+                '--artifact-path', rel_path,
+                '--classes', 'Normal', 'Wheeze', 'Crackle',
+                '--sample-rate', '8000',
+                '--apply-bandpass',
+                '--normalization', 'minmax_01',
+                '--top-db', '80.0',
+                '--filter-order', '5',
+            )
+
+        model = ModelVersion.objects.get(version='pediatric-cnn-full-config-v1')
+        self.assertEqual(model.preprocessing_config['sample_rate'], 8000)
+        self.assertTrue(model.preprocessing_config['apply_bandpass'])
+        self.assertEqual(model.preprocessing_config['normalization'], 'minmax_01')
+        self.assertEqual(model.preprocessing_config['top_db'], 80.0)
+        self.assertEqual(model.preprocessing_config['filter_order'], 5)
+
+
+class PreprocessingValidationTests(TestCase):
+    """
+    Regression and safety tests for model-specific preprocessing validation,
+    missing configuration key detection, NaN/Inf rejection, and dimension guards.
+    """
+
+    def test_validate_preprocessing_config_missing_required_keys(self):
+        from ml_inference.services import AudioPreprocessor
+        # Missing sample_rate and hop_length
+        partial_config = {'n_mels': 128, 'n_fft': 1024}
+        with self.assertRaises(ValueError) as ctx:
+            AudioPreprocessor.validate_preprocessing_config(partial_config)
+        self.assertIn("Missing required parameter(s)", str(ctx.exception))
+        self.assertIn("sample_rate", str(ctx.exception))
+        self.assertIn("hop_length", str(ctx.exception))
+
+    def test_validate_preprocessing_config_invalid_normalization(self):
+        from ml_inference.services import AudioPreprocessor
+        invalid_config = {
+            'sample_rate': 8000,
+            'n_mels': 128,
+            'n_fft': 1024,
+            'hop_length': 512,
+            'normalization': 'invalid_method_xyz'
+        }
+        with self.assertRaises(ValueError) as ctx:
+            AudioPreprocessor.validate_preprocessing_config(invalid_config)
+        self.assertIn("Invalid normalization method", str(ctx.exception))
+
+    def test_prepare_cnn_input_rejects_nan_inf(self):
+        import numpy as np
+        import tempfile
+        import soundfile as sf
+        import os
+        from ml_inference.services import AudioPreprocessor
+        from unittest.mock import patch
+
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            audio = np.zeros(8000, dtype=np.float32)
+            sf.write(tmp_path, audio, 8000)
+            config = {
+                'sample_rate': 8000,
+                'n_mels': 128,
+                'n_fft': 1024,
+                'hop_length': 512,
+            }
+            # Mock compute_mel_spectrogram to return NaN array
+            nan_spec = np.full((128, 128), np.nan, dtype=np.float32)
+            with patch.object(AudioPreprocessor, 'compute_mel_spectrogram', return_value=nan_spec):
+                with self.assertRaises(ValueError) as ctx:
+                    AudioPreprocessor.prepare_cnn_input(tmp_path, config=config)
+                self.assertIn("contains NaN or Inf values", str(ctx.exception))
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_prepare_cnn_input_dimension_validation(self):
+        import numpy as np
+        import tempfile
+        import soundfile as sf
+        import os
+        from ml_inference.services import AudioPreprocessor
+
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            audio = np.zeros(8000, dtype=np.float32)
+            sf.write(tmp_path, audio, 8000)
+            config = {
+                'sample_rate': 8000,
+                'n_mels': 128,
+                'n_fft': 1024,
+                'hop_length': 512,
+                'apply_bandpass': True,
+                'normalization': 'minmax_01',
+            }
+            tensor = AudioPreprocessor.prepare_cnn_input(
+                tmp_path,
+                config=config,
+                expected_shape=[1, 128, 128, 1]
+            )
+            self.assertEqual(tensor.ndim, 4)
+            self.assertEqual(tensor.shape, (1, 128, 128, 1))
+            self.assertFalse(np.isnan(tensor).any())
+            self.assertFalse(np.isinf(tensor).any())
+            self.assertTrue(tensor.min() >= 0.0)
+            self.assertTrue(tensor.max() <= 1.0)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+
 
