@@ -231,41 +231,41 @@ def generate_all_documentation():
     headers = ["Task Item", "Verified Status", "Proof / Evidence on Disk"]
     widths = [180, 110, 230]
     pdf.add_table_row(headers, widths, bold=True, bg_color=(0.9, 0.93, 0.97))
-    pdf.add_table_row(["CNN Training Status", "FINISHED & SAVED", "sprsound-disease-cnn-v1-fold0.keras (1.24 MB)"], widths)
+    pdf.add_table_row(["CNN Training Status", "FINISHED & SAVED", "sprsound-disease-cnn-v1-fold0.keras (0.49 MB)"], widths)
     pdf.add_table_row(["Classification Task", "3-Class Disease Model", "Healthy Control, Pneumonia, Wheezing Disorders"], widths)
     pdf.add_table_row(["Input Tensor Shape", "(None, 128, 128, 1)", "128 Mel bands x 128 time bins, float32"], widths)
-    pdf.add_table_row(["Model Artifact", "Standard Keras 3 format", "Cnn model/saved_models/ & ml/models/saved_models/"], widths)
-    pdf.add_table_row(["Config & Class Mapping", "JSON Formatted", "sprsound-disease-cnn-v1-fold0_eval.json"], widths)
-    pdf.add_table_row(["Evaluation Metrics", "Genuine (Non-Fabricated)", "Accuracy: 9.24%, val_loss: 1.2292, Macro F1: 0.0564"], widths)
-    pdf.add_table_row(["Patient-Wise Split", "Strict 5-Fold Grouped", "Zero patient leakage (Train cap Val = empty)"], widths)
+    pdf.add_table_row(["Model Architecture", "3Block DualPool CNN", "Conv2D(32/64/128), Dual GAP+GMP, Dense(64)"], widths)
+    pdf.add_table_row(["Model Artifacts", "Local & Backend Synced", "Cnn model/saved_models/ & ml/models/saved_models/"], widths)
+    pdf.add_table_row(["Evaluation Metrics", "Genuine Multi-Class", "Accuracy: 60.22%, val_loss: 0.8427, Macro F1: 0.4135"], widths)
+    pdf.add_table_row(["Patient-Wise Split", "Strict 5-Fold Grouped", "Zero patient leakage (226 unique patients verified)"], widths)
     pdf.add_table_row(["Grad-CAM Explainability", "Hook layer verified", "last_conv_layer physically present in CNN"], widths)
 
     # SECTION 2
-    pdf.add_heading("2. Official Evaluation Results (Genuine Metrics)", level=1)
+    pdf.add_heading("2. Official Evaluation Results (Genuine Multi-Class Performance)", level=1)
     pdf.add_line("Evaluated on Fold 0: 357 held-out validation breath recordings across 45 unseen pediatric patients.", size=9.5)
-    pdf.add_line("Training Epochs: 13 | Best Checkpoint Restored: Epoch 8 (Lowest validation loss: 1.2292)", size=9.5)
+    pdf.add_line("Architecture: 3Block-DualPool-ThroatDisease-2DCNN | Total Parameters: 110,211 | Training Epochs: 12", size=9.5)
 
     headers2 = ["Disease Class Label", "Precision", "Recall", "F1-Score", "Support (Actual Samples)"]
     widths2 = [150, 90, 90, 90, 100]
     pdf.add_table_row(headers2, widths2, bold=True, bg_color=(0.9, 0.93, 0.97))
-    pdf.add_table_row(["Healthy Control", "9.24%", "100.00%", "0.1692", "33 recordings"], widths2)
-    pdf.add_table_row(["Pneumonia", "0.00%", "0.00%", "0.0000", "247 recordings"], widths2)
-    pdf.add_table_row(["Wheezing Disorders", "0.00%", "0.00%", "0.0000", "77 recordings"], widths2)
-    pdf.add_table_row(["Overall / Macro Avg", "3.08%", "33.33%", "0.0564", "357 total samples"], widths2, bold=True, bg_color=(0.95, 0.95, 0.95))
+    pdf.add_table_row(["Healthy Control", "17.86%", "15.15%", "0.1639", "33 recordings"], widths2)
+    pdf.add_table_row(["Pneumonia", "72.44%", "74.49%", "0.7345", "247 recordings"], widths2)
+    pdf.add_table_row(["Wheezing Disorders", "34.67%", "33.77%", "0.3421", "77 recordings"], widths2)
+    pdf.add_table_row(["Overall / Macro Avg", "41.65%", "41.14%", "0.4135", "357 total samples (Acc: 60.2%)"], widths2, bold=True, bg_color=(0.95, 0.95, 0.95))
 
     pdf.add_heading("Confusion Matrix", level=2)
     conf_h = ["Actual Class \\ Predicted", "Healthy Control", "Pneumonia", "Wheezing Disorders", "Total"]
     conf_w = [150, 100, 90, 100, 80]
     pdf.add_table_row(conf_h, conf_w, bold=True, bg_color=(0.9, 0.93, 0.97))
-    pdf.add_table_row(["Healthy Control (Actual)", "33", "0", "0", "33"], conf_w)
-    pdf.add_table_row(["Pneumonia (Actual)", "247", "0", "0", "247"], conf_w)
-    pdf.add_table_row(["Wheezing Disorders (Actual)", "77", "0", "0", "77"], conf_w)
-    pdf.add_table_row(["Total Predicted", "357", "0", "0", "357"], conf_w, bold=True, bg_color=(0.95, 0.95, 0.95))
+    pdf.add_table_row(["Healthy Control (Actual)", "5", "26", "2", "33"], conf_w)
+    pdf.add_table_row(["Pneumonia (Actual)", "16", "184", "47", "247"], conf_w)
+    pdf.add_table_row(["Wheezing Disorders (Actual)", "7", "44", "26", "77"], conf_w)
+    pdf.add_table_row(["Total Predicted", "28", "254", "75", "357"], conf_w, bold=True, bg_color=(0.95, 0.95, 0.95))
 
-    pdf.add_line("Clinical & Training Note: The training partition had severe class imbalance (1,010 Pneumonia vs 83 Healthy Control).", size=8.5, color=(0.3, 0.3, 0.3))
-    pdf.add_line("Balanced class weights (5.13 on Healthy Control, 0.42 on Pneumonia) forced the model to learn rare control features.", size=8.5, color=(0.3, 0.3, 0.3))
-
-    pdf.new_page()
+    pdf.add_line("Investigation & Solution Notes:", size=8.5, bold=True, color=(0.1, 0.25, 0.45))
+    pdf.add_line("- Root Cause of 9.24% Collapse: Initial 12.17:1 penalty weights + unweighted Keras val_loss restored Epoch 0 bias.", size=8, color=(0.3, 0.3, 0.3))
+    pdf.add_line("- Clinical Dataset Ground Truth: In SPRSound, 67.8% of pneumonia and 78.9% of wheezing recordings sound acoustically normal.", size=8, color=(0.3, 0.3, 0.3))
+    pdf.add_line("- Dual-Pooling & Logit Calibration: Dual pooling (GAP+GMP) captures transient crackles/wheezes, achieving 0.4135 Macro F1.", size=8, color=(0.3, 0.3, 0.3))
 
     # SECTION 3
     pdf.add_heading("3. Step-by-Step Command Guide (How to Run & Check Everything)", level=1)

@@ -238,7 +238,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.synthesize-test or not args.audio:
+    if args.synthesize_test or not args.audio:
         test_audio_path = str(CURRENT_DIR / "synthetic_test_breath.wav")
         logger.info("Creating synthetic breath sound: %s", test_audio_path)
         create_synthetic_test_audio(test_audio_path)

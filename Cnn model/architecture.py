@@ -90,16 +90,20 @@ def build_throat_disease_cnn(
     )(x)
     x = layers.BatchNormalization(name="bn_b3")(x)
     x = layers.ReLU(name="relu_b3")(x)
-    x = layers.GlobalAveragePooling2D(name="gap")(x)
-    x = layers.Dropout(0.4, name="drop_gap")(x)
+    x = layers.MaxPooling2D((2, 2), name="pool_b3")(x)
+
+    # Dual Pooling: Global Average + Global Max captures transient crackles and harmonic wheezes
+    gap = layers.GlobalAveragePooling2D(name="gap")(x)
+    gmp = layers.GlobalMaxPooling2D(name="gmp")(x)
+    pooled = layers.Concatenate(name="dual_pool")([gap, gmp])
 
     # Classification Head
     x = layers.Dense(
         64, activation="relu",
         kernel_regularizer=regularizers.l2(l2_reg),
         name="dense_fc"
-    )(x)
-    x = layers.Dropout(0.4, name="drop_fc")(x)
+    )(pooled)
+    x = layers.Dropout(0.3, name="drop_fc")(x)
     outputs = layers.Dense(
         num_classes, activation="softmax",
         name="disease_output"

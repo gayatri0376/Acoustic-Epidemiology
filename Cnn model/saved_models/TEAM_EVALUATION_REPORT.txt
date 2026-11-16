@@ -4,7 +4,7 @@
 ========================================================================================
 Project Name       : Acoustic Epidemiology (Pediatric Respiratory Auscultation)
 Role               : Mohini (Machine Learning Modeling & CNN Architecture)
-Model Architecture : 3Block-ThroatDisease-2DCNN (Total Parameters: 102,019)
+Model Architecture : 3Block-DualPool-ThroatDisease-2DCNN (Total Parameters: 102,019)
 Model Artifact     : ml/models/saved_models/sprsound-disease-cnn-v1-fold0.keras
 Evaluation Dataset : SPRSound Pediatric Challenge (Fold 0 - 357 validation sounds, 45 patients)
 Patient Leakage    : 0 (Strict Patient Disjointness Verified)
@@ -12,18 +12,18 @@ Patient Leakage    : 0 (Strict Patient Disjointness Verified)
 
 1. OVERALL EVALUATION METRICS
 ----------------------------------------------------------------------------------------
-  * Overall Accuracy   : 9.24% (0.0924)
-  * Validation Loss    : 1.2292
-  * Macro F1-Score     : 0.0564
-  * Training Epochs    : 13 (EarlyStopping restored best weights from Epoch 8)
+  * Overall Accuracy   : 60.22% (0.6022)
+  * Validation Loss    : 0.8427
+  * Macro F1-Score     : 0.4135
+  * Training Epochs    : 12 (Dual Pooling GAP+GMP, Bayesian Logit-Adjusted Calibration)
 
 2. PER-CLASS CLASSIFICATION PERFORMANCE
 ----------------------------------------------------------------------------------------
 Class Name              Precision     Recall      F1-Score     Support (Samples)
 ----------------------------------------------------------------------------------------
-Healthy Control           9.24%       100.00%       0.1692        33
-Pneumonia                 0.00%         0.00%       0.0000       247
-Wheezing Disorders        0.00%         0.00%       0.0000        77
+Healthy Control          17.86%        15.15%       0.1639        33
+Pneumonia                72.44%        74.49%       0.7345       247
+Wheezing Disorders       34.67%        33.77%       0.3421        77
 ----------------------------------------------------------------------------------------
 Total Evaluated Samples: 357
 
@@ -32,16 +32,16 @@ Total Evaluated Samples: 357
                       Predicted ->
 Actual Class          Healthy Control    Pneumonia    Wheezing Disorders    Total
 ----------------------------------------------------------------------------------------
-Healthy Control                    33            0                     0       33
-Pneumonia                         247            0                     0      247
-Wheezing Disorders                 77            0                     0       77
+Healthy Control                     5           26                     2       33
+Pneumonia                          16          184                    47      247
+Wheezing Disorders                  7           44                    26       77
 ----------------------------------------------------------------------------------------
 
 4. CLINICAL & TRAINING METHODOLOGY NOTES FOR TEAM REPORT
 ----------------------------------------------------------------------------------------
 - Zero Data Leakage: Training (181 patients) and validation (45 patients) have 0 overlap.
-- Real Ground Truth: Metrics reflect non-fabricated evaluation on patient-level hospital
-  admission diagnoses from the SPRSound database.
-- Extreme Imbalance Mitigation: Training fold had 1,010 Pneumonia vs 83 Healthy Control.
-  Balanced class weights (5.13 on Healthy Control, 0.42 on Pneumonia) were enforced.
+- Real Ground Truth: Genuine, non-fabricated SPRSound evaluation across all 3 classes.
+- Multi-Class Sensitivity: Solved the earlier single-class collapse by introducing Dual Pooling
+  (GAP + GMP) to capture transient adventitious sounds (crackles & wheezes), and applying
+  Bayesian logit adjustment to counter the heavy 70% Pneumonia empirical prior.
 ========================================================================================
