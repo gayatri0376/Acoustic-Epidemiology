@@ -23,6 +23,16 @@ if str(PROJECT_ROOT) not in sys.path:
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
+# Ensure writable KERAS_HOME in sandboxed environments
+if "KERAS_HOME" not in os.environ:
+    import tempfile
+    _safe_keras = os.path.join(tempfile.gettempdir(), ".keras")
+    try:
+        os.makedirs(_safe_keras, exist_ok=True)
+        os.environ["KERAS_HOME"] = _safe_keras
+    except Exception:
+        pass
+
 try:
     from .config import (
         DISEASE_CLASSES,

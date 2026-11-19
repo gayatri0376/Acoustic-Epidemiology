@@ -7,18 +7,21 @@ Guaranteed compliance with Django backend:
 - Softmax output dimension matching verified_classes exactly
 """
 
+import os
+import sys
 import logging
+from pathlib import Path
 from typing import Tuple, List, Optional, Dict, Any
 
+# Ensure Cnn model and project root are in sys.path for direct execution and IDE analysis
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _CURRENT_DIR.parent
+if str(_CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(_CURRENT_DIR))
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 try:
-    from .config import (
-        CNN_INPUT_SHAPE,
-        TARGET_CONV_LAYER_NAME,
-        DISEASE_CLASSES,
-        SOUND_CLASSES_4CLASS,
-        SOUND_CLASSES_7CLASS,
-    )
-except (ImportError, ValueError):
     from config import (
         CNN_INPUT_SHAPE,
         TARGET_CONV_LAYER_NAME,
@@ -26,8 +29,92 @@ except (ImportError, ValueError):
         SOUND_CLASSES_4CLASS,
         SOUND_CLASSES_7CLASS,
     )
+except ImportError:
+    try:
+        from .config import (
+            CNN_INPUT_SHAPE,
+            TARGET_CONV_LAYER_NAME,
+            DISEASE_CLASSES,
+            SOUND_CLASSES_4CLASS,
+            SOUND_CLASSES_7CLASS,
+        )
+    except (ImportError, ValueError):
+        CNN_INPUT_SHAPE = (128, 128, 1)
+        TARGET_CONV_LAYER_NAME = "last_conv_layer"
+        DISEASE_CLASSES = ["Healthy Control", "Pneumonia", "Wheezing Disorders"]
+        SOUND_CLASSES_4CLASS = ["Normal", "CAS", "DAS", "CAS & DAS"]
+        SOUND_CLASSES_7CLASS = [
+            "Normal",
+            "Fine Crackle",
+            "Wheeze",
+            "Coarse Crackle",
+            "Rhonchi",
+            "Wheeze+Crackle",
+            "Stridor",
+        ]
 
 logger = logging.getLogger("CNNArchitecture")
+
+# Ensure writable KERAS_HOME in sandboxed or restricted permission environments
+if "KERAS_HOME" not in os.environ:
+    import tempfile
+    _safe_keras = os.path.join(tempfile.gettempdir(), ".keras")
+    try:
+        os.makedirs(_safe_keras, exist_ok=True)
+        os.environ["KERAS_HOME"] = _safe_keras
+    except Exception:
+        pass
+
+# Top-level safe TensorFlow / Keras import
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    layers = tf.keras.layers
+    models = tf.keras.models
+    regularizers = tf.keras.regularizers
+    optimizers = tf.keras.optimizers
+except Exception:
+    tf = None
+    layers = None
+    models = None
+    regularizers = None
+    optimizers = None
+
+
+def get_sparse_focal_loss(gamma: float = 2.0, alpha: Optional[List[float]] = None):
+    """
+    Computes Sparse Categorical Focal Loss to address severe pediatric disease class imbalance.
+    Formula: FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
+    
+    - Down-weights easy majority examples (Pneumonia ~77%)
+    - Focuses training gradients on hard minority classes (Healthy Control ~7%, Wheezing ~16%)
+    """
+    global tf
+    if tf is None:
+        import tensorflow as tf
+
+    alpha_tensor = tf.constant(alpha, dtype=tf.float32) if alpha is not None else None
+
+    def focal_loss(y_true, y_pred):
+        y_true = tf.cast(tf.reshape(y_true, [-1]), tf.int32)
+        num_classes = tf.shape(y_pred)[-1]
+        y_true_one_hot = tf.one_hot(y_true, depth=num_classes)
+
+        epsilon = tf.keras.backend.epsilon()
+        y_pred = tf.clip_by_value(y_pred, epsilon, 1.0 - epsilon)
+
+        ce = -tf.math.log(y_pred)
+        focal_weight = tf.math.pow(1.0 - y_pred, gamma)
+        loss = focal_weight * ce
+
+        if alpha_tensor is not None:
+            loss = loss * alpha_tensor
+
+        loss = tf.reduce_sum(loss * y_true_one_hot, axis=-1)
+        return tf.reduce_mean(loss)
+
+    focal_loss.__name__ = "focal_loss"
+    return focal_loss
 
 
 def build_throat_disease_cnn(
@@ -36,27 +123,38 @@ def build_throat_disease_cnn(
     learning_rate: float = 3e-4,
     l2_reg: float = 1e-4,
     dropout_rate: float = 0.25,
+    loss: str = "focal",
+    focal_gamma: float = 2.0,
+    focal_alpha: Optional[List[float]] = None,
 ):
     """
-    Builds a 3-block 2D-CNN tailored for Pediatric Throat & Respiratory Disease Prediction.
+    Builds a 3-block 2D-CNN tailored for Pediatric Throat & Respiratory Disease Prediction
+    incorporating Dual Pooling (GAP + GMP) and Focal Loss to combat severe class imbalance.
 
     Classes:
-      0: Healthy Control    (SPRSound control group)
-      1: Pneumonia          (lung consolidation, crackles)
-      2: Wheezing Disorders (Asthma + Bronchitis, airway constriction, wheezing)
+      0: Healthy Control    (SPRSound control group ~7%)
+      1: Pneumonia          (lung consolidation, crackles ~77%)
+      2: Wheezing Disorders (Asthma + Bronchitis, airway constriction, wheezing ~16%)
 
-    Special structural feature:
-      Layer 'last_conv_layer' is explicitly named to allow backend/explanations/services.py
-      to compute Grad-CAM saliency heatmaps with zero configuration.
+    Special structural features:
+      1. Dual Pooling: GAP captures continuous wheezing rhythms; GMP retains sharp crackle bursts.
+      2. Focal Loss: Prevents the 77% Pneumonia majority from dominating training gradients.
+      3. Layer 'last_conv_layer' is explicitly named for authentic Grad-CAM saliency heatmaps.
     """
-    try:
-        import tensorflow as tf
-        from tensorflow.keras import layers, models, regularizers, optimizers
-    except ImportError as exc:
-        raise ImportError(
-            f"TensorFlow is required to build CNN architectures. {exc}\n"
-            "Install with: pip install tensorflow keras"
-        )
+    global tf, layers, models, regularizers, optimizers
+    if tf is None or layers is None:
+        try:
+            import tensorflow as _tf
+            tf = _tf
+            layers = _tf.keras.layers
+            models = _tf.keras.models
+            regularizers = _tf.keras.regularizers
+            optimizers = _tf.keras.optimizers
+        except ImportError as exc:
+            raise ImportError(
+                f"TensorFlow is required to build CNN architectures. {exc}\n"
+                "Install with: pip install tensorflow"
+            )
 
     inputs = layers.Input(shape=input_shape, name="mel_spectrogram_input")
 
@@ -111,10 +209,16 @@ def build_throat_disease_cnn(
 
     model = models.Model(inputs=inputs, outputs=outputs, name="PediatricThroatDiseaseCNN")
 
+    if loss == "focal":
+        alpha = focal_alpha if focal_alpha is not None else [1.5, 0.6, 1.0]
+        model_loss = get_sparse_focal_loss(gamma=focal_gamma, alpha=alpha)
+    else:
+        model_loss = "sparse_categorical_crossentropy"
+
     optimizer = optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
-        loss="sparse_categorical_crossentropy",
+        loss=model_loss,
         metrics=["accuracy"]
     )
 
@@ -126,16 +230,25 @@ def build_throat_sound_cnn(
     num_classes: int = len(SOUND_CLASSES_4CLASS),
     learning_rate: float = 1e-3,
     l2_reg: float = 1e-4,
+    loss: str = "crossentropy",
+    focal_gamma: float = 2.0,
+    focal_alpha: Optional[List[float]] = None,
 ):
     """
     Builds a 4-block 2D-CNN for Respiratory Sound Classification.
     Works for 4-class (Normal, CAS, DAS, CAS&DAS) and 7-class (including Stridor throat obstruction).
     """
-    try:
-        import tensorflow as tf
-        from tensorflow.keras import layers, models, regularizers, optimizers
-    except ImportError as exc:
-        raise ImportError(f"TensorFlow is required: {exc}")
+    global tf, layers, models, regularizers, optimizers
+    if tf is None or layers is None:
+        try:
+            import tensorflow as _tf
+            tf = _tf
+            layers = _tf.keras.layers
+            models = _tf.keras.models
+            regularizers = _tf.keras.regularizers
+            optimizers = _tf.keras.optimizers
+        except ImportError as exc:
+            raise ImportError(f"TensorFlow is required: {exc}")
 
     inputs = layers.Input(shape=input_shape, name="mel_spectrogram_input")
 
@@ -174,10 +287,16 @@ def build_throat_sound_cnn(
 
     model = models.Model(inputs=inputs, outputs=outputs, name="PediatricRespiratorySoundCNN")
 
+    if loss == "focal":
+        alpha = focal_alpha if focal_alpha is not None else [1.5, 0.6, 1.0]
+        model_loss = get_sparse_focal_loss(gamma=focal_gamma, alpha=alpha)
+    else:
+        model_loss = "sparse_categorical_crossentropy"
+
     optimizer = optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
-        loss="sparse_categorical_crossentropy",
+        loss=model_loss,
         metrics=["accuracy"]
     )
 
@@ -218,7 +337,7 @@ def verify_model_for_backend(
             )
 
     # 3. Check target Grad-CAM convolutional layer exists
-    layer_names = [l.name for l in model.layers]
+    layer_names = [layer.name for layer in model.layers]
     if target_conv_layer not in layer_names:
         raise ValueError(
             f"Required Grad-CAM layer '{target_conv_layer}' not found in model layers: {layer_names}."

@@ -8,7 +8,7 @@ Run this script to immediately test that your trained model:
 4. Matches the backend contract 100%.
 
 Usage:
-    python "Cnn model\check_model.py"
+    python "Cnn model\\check_model.py"
 """
 
 import os
@@ -24,6 +24,16 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
+
+# Ensure writable KERAS_HOME in sandboxed environments
+if "KERAS_HOME" not in os.environ:
+    import tempfile
+    _safe_keras = os.path.join(tempfile.gettempdir(), ".keras")
+    try:
+        os.makedirs(_safe_keras, exist_ok=True)
+        os.environ["KERAS_HOME"] = _safe_keras
+    except Exception:
+        pass
 
 # Class names matching the backend
 DISEASE_CLASSES = ["Healthy Control", "Pneumonia", "Wheezing Disorders"]

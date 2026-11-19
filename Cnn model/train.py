@@ -83,6 +83,7 @@ def train_model(
     learning_rate: float = 3e-4,
     dry_run: bool = False,
     augment: bool = True,
+    loss: str = "focal",
     output_dir: Path = LOCAL_SAVED_MODELS_DIR,
 ) -> Dict[str, Any]:
     """
@@ -132,13 +133,15 @@ def train_model(
         model = build_throat_disease_cnn(
             input_shape=(128, 128, 1),
             num_classes=num_classes,
-            learning_rate=learning_rate
+            learning_rate=learning_rate,
+            loss=loss
         )
     else:
         model = build_throat_sound_cnn(
             input_shape=(128, 128, 1),
             num_classes=num_classes,
-            learning_rate=learning_rate
+            learning_rate=learning_rate,
+            loss=loss
         )
 
     model.summary(print_fn=logger.info)
@@ -197,14 +200,16 @@ def train_model(
     ]
 
     # 6. Model Training
-    logger.info("Commencing training for %d epochs...", epochs)
+    # For Focal Loss, alpha tensor inside loss already balances classes; for crossentropy, use class_weights
+    fit_class_weights = None if loss == "focal" else class_weights
+    logger.info("Commencing training for %d epochs (Loss: %s)...", epochs, loss.upper())
     history = model.fit(
         X_train_final,
         y_train_final,
         validation_data=(X_val, y_val),
         epochs=epochs,
         batch_size=batch_size,
-        class_weight=class_weights,
+        class_weight=fit_class_weights,
         callbacks=callbacks,
         verbose=1
     )
@@ -305,6 +310,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument("--loss", choices=["focal", "crossentropy"], default="focal", help="Loss function: 'focal' (Dual Pooling + Focal Loss) or 'crossentropy'")
     parser.add_argument("--no-augment", action="store_true", help="Disable spectrogram augmentation")
     parser.add_argument("--dry-run", action="store_true", help="Verify pipeline and forward pass without full training")
 
@@ -316,6 +322,7 @@ if __name__ == "__main__":
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.lr,
+        loss=args.loss,
         augment=not args.no_augment,
         dry_run=args.dry_run,
     )

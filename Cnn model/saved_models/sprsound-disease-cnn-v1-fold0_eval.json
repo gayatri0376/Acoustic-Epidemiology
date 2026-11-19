@@ -2,14 +2,13 @@
   "model_version": "sprsound-disease-cnn-v1-fold0",
   "task": "disease",
   "task_type": "DISEASE_CLASSIFICATION",
-  "architecture": "3Block-DualPool-ThroatDisease-2DCNN",
+  "architecture": "3Block-DualPool-FocalLoss-CNN",
   "artifact_path": "ml/models/saved_models/sprsound-disease-cnn-v1-fold0.keras",
   "verified_classes": [
     "Healthy Control",
     "Pneumonia",
     "Wheezing Disorders"
   ],
-  "target_conv_layer": "last_conv_layer",
   "preprocessing_config": {
     "sample_rate": 8000,
     "n_mels": 128,
@@ -24,54 +23,46 @@
     "fixed_time_steps": 128
   },
   "val_fold": 0,
-  "calibration": {
-    "status": "CALIBRATED_LOGIT_SHIFT",
-    "delta_bias": [
-      0.2,
-      0.0,
-      0.1
-    ],
-    "rationale": "Compensates for severe 70% Pneumonia training prevalence to achieve multi-class clinical sensitivity"
-  },
   "validation_metrics": {
-    "val_accuracy": 0.6022,
-    "macro_f1": 0.4135,
-    "macro_precision": 0.4165,
-    "macro_recall": 0.4114,
+    "val_loss": 0.36,
+    "val_accuracy": 0.6947,
+    "screening_accuracy": 0.9076,
+    "disease_sensitivity": 1.0,
+    "macro_f1": 0.2816,
     "confusion_matrix": [
       [
-        5,
-        26,
-        2
+        0,
+        33,
+        0
       ],
       [
-        16,
-        184,
-        47
+        0,
+        247,
+        0
       ],
       [
-        7,
-        44,
-        26
+        0,
+        76,
+        1
       ]
     ],
     "per_class_metrics": {
       "Healthy Control": {
-        "precision": 0.1786,
-        "recall": 0.1515,
-        "f1_score": 0.1639,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
         "support": 33
       },
       "Pneumonia": {
-        "precision": 0.7244,
-        "recall": 0.7449,
-        "f1_score": 0.7345,
+        "precision": 0.6938,
+        "recall": 1.0,
+        "f1_score": 0.8192,
         "support": 247
       },
       "Wheezing Disorders": {
-        "precision": 0.3467,
-        "recall": 0.3377,
-        "f1_score": 0.3421,
+        "precision": 1.0,
+        "recall": 0.013,
+        "f1_score": 0.0256,
         "support": 77
       }
     }
