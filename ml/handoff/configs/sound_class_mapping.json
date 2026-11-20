@@ -1,0 +1,22 @@
+{
+  "classes": [
+    "Normal",
+    "CAS",
+    "DAS",
+    "CAS & DAS"
+  ],
+  "class_to_index": {
+    "Normal": 0,
+    "CAS": 1,
+    "DAS": 2,
+    "CAS & DAS": 3
+  },
+  "index_to_class": {
+    "0": "Normal",
+    "1": "CAS",
+    "2": "DAS",
+    "3": "CAS & DAS"
+  },
+  "task_type": "SOUND_CLASSIFICATION",
+  "task_id": "SPRSOUND_RECORD_4CLASS"
+}

@@ -1,0 +1,7 @@
+Model / Experiment,Partition,Sample N,Accuracy,Balanced Acc,Macro F1,Weighted F1,Normal/Healthy Rec,CAS/Wheeze Rec,DAS/Pneumonia Rec,CAS&DAS/WheezeDis Rec,Status / Decision
+Disease Model Exp 1,Val Fold 0,357,69.47%,33.77%,0.2816,0.5723,0.00%,1.30%,100.00%,N/A,Rejected (Collapsed to Pneumonia)
+Disease Model Exp 4,Val Fold 0,357,43.70%,42.06%,0.2845,0.0000,72.73%,0.00%,53.44%,N/A,Rejected (0% Wheezing Recall)
+Acoustic Baseline v1 (Center-Crop),Val Fold 0,354,74.29%,33.46%,0.3284,0.6948,93.87%,0.00%,34.69%,5.26%,Reproducible Baseline Checkpoint
+Acoustic Baseline v1 (Center-Crop),Held-Out Test,347,58.50%,37.12%,0.3018,0.5808,77.59%,1.54%,45.83%,23.53%,Active 4-Class Test (Research Only)
+Sliding-Window v1 (stride_64_abnormality_max),Val Fold 0,354,74.29%,34.29%,0.3342,0.6963,93.10%,0.00%,38.78%,5.26%,Optimal Config Selected on Val
+Sliding-Window v1 (stride_64_abnormality_max),Held-Out Test,347,55.62%,34.01%,0.2666,0.5562,74.27%,0.00%,50.00%,11.76%,Evaluated on Independent Test

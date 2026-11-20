@@ -1,0 +1,20 @@
+{
+  "classes": [
+    "Healthy Control",
+    "Pneumonia",
+    "Wheezing Disorders"
+  ],
+  "class_to_index": {
+    "Healthy Control": 0,
+    "Pneumonia": 1,
+    "Wheezing Disorders": 2
+  },
+  "index_to_class": {
+    "0": "Healthy Control",
+    "1": "Pneumonia",
+    "2": "Wheezing Disorders"
+  },
+  "task_type": "DISEASE_CLASSIFICATION",
+  "task_id": "SPRSOUND_DISEASE_3CLASS",
+  "clinical_validation_status": "EXPERIMENTAL_NOT_CLINICALLY_VALIDATED"
+}

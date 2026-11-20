@@ -1,0 +1,45 @@
+{
+  "total_samples": 357,
+  "unique_patients": 45,
+  "accuracy": 0.6947,
+  "balanced_accuracy": 0.3377,
+  "macro_f1": 0.2816,
+  "weighted_f1": 0.5723,
+  "confusion_matrix": [
+    [
+      0,
+      33,
+      0
+    ],
+    [
+      0,
+      247,
+      0
+    ],
+    [
+      0,
+      76,
+      1
+    ]
+  ],
+  "per_class_metrics": {
+    "Healthy Control": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 33
+    },
+    "Pneumonia": {
+      "precision": 0.6938,
+      "recall": 1.0,
+      "f1_score": 0.8192,
+      "support": 247
+    },
+    "Wheezing Disorders": {
+      "precision": 1.0,
+      "recall": 0.013,
+      "f1_score": 0.0256,
+      "support": 77
+    }
+  }
+}

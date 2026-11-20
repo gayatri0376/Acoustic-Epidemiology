@@ -697,3 +697,511 @@ class PreprocessingValidationTests(TestCase):
 
 
 
+
+
+# =============================================================================
+# TASK 8 — Model Routing, API Safety & Serializer Tests
+# Added: 2026-11-20
+# =============================================================================
+
+class ModelRoutingTests(TestCase):
+    """
+    Phase 1 & 2 — Verifies that InferenceService.get_active_model() correctly
+    filters by task_type=SOUND_CLASSIFICATION so that:
+    - Acoustic endpoint never selects a DISEASE_CLASSIFICATION model.
+    - Disease endpoint never selects a SOUND_CLASSIFICATION model.
+    - Selection is deterministic when multiple models share ACTIVE status.
+
+    ISSUE-3 regression suite: confirms the fix is permanently in place.
+    """
+
+    def _make_model(self, version, task_type, status, artifact_path='ml/models/saved_models/sprsound-cnn-v1-fold0.keras'):
+        from ml_inference.models import ModelVersion, ModelTaskType
+        return ModelVersion.objects.create(
+            version=version,
+            task_type=task_type,
+            status=status,
+            artifact_path=artifact_path,
+            verified_classes=['Normal', 'CAS', 'DAS', 'CAS & DAS'] if task_type == 'SOUND_CLASSIFICATION'
+                             else ['Healthy Control', 'Pneumonia', 'Wheezing Disorders'],
+        )
+
+    def test_get_active_model_returns_only_sound_classification(self):
+        """ISSUE-3 FIX: get_active_model() must never return a DISEASE model."""
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from ml_inference.services import InferenceService
+
+        sound_model = self._make_model(
+            'routing-test-sound-v1',
+            ModelTaskType.SOUND_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+        )
+        # Disease model is also ACTIVE — without the fix, ordering by -created_at
+        # could cause this model to be returned first.
+        disease_model = self._make_model(
+            'routing-test-disease-v1',
+            ModelTaskType.DISEASE_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+        )
+
+        result = InferenceService.get_active_model()
+        self.assertIsNotNone(result, "Expected an active sound model to be found.")
+        self.assertEqual(
+            result.task_type,
+            ModelTaskType.SOUND_CLASSIFICATION,
+            f"get_active_model() returned task_type={result.task_type!r}; "
+            "expected SOUND_CLASSIFICATION. ISSUE-3 regression."
+        )
+        self.assertNotEqual(
+            result.id,
+            disease_model.id,
+            "get_active_model() must never return the DISEASE_CLASSIFICATION model."
+        )
+
+    def test_get_active_model_returns_none_when_only_disease_model_active(self):
+        """If only a DISEASE model is active, acoustic endpoint must return None (503)."""
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from ml_inference.services import InferenceService
+
+        self._make_model(
+            'routing-only-disease-v1',
+            ModelTaskType.DISEASE_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+        )
+        result = InferenceService.get_active_model()
+        self.assertIsNone(
+            result,
+            "get_active_model() must return None when no SOUND_CLASSIFICATION model is active. "
+            "Returned a disease model — ISSUE-3 not fixed."
+        )
+
+    def test_get_active_disease_model_returns_only_disease_classification(self):
+        """DiseaseInferenceService must never return a SOUND_CLASSIFICATION model."""
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from ml_inference.disease_service import DiseaseInferenceService
+
+        self._make_model(
+            'routing-test-sound-v2',
+            ModelTaskType.SOUND_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+        )
+        # Only disease model should be found
+        disease_model = self._make_model(
+            'routing-test-disease-v2',
+            ModelTaskType.DISEASE_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+        )
+
+        result = DiseaseInferenceService.get_active_disease_model()
+        self.assertIsNotNone(result)
+        self.assertEqual(result.task_type, ModelTaskType.DISEASE_CLASSIFICATION)
+        self.assertEqual(result.id, disease_model.id)
+
+    def test_get_active_model_returns_none_when_no_active_model(self):
+        """503 path: no model at all — must return None, not raise an exception."""
+        from ml_inference.services import InferenceService
+        result = InferenceService.get_active_model()
+        self.assertIsNone(result)
+
+    def test_retired_sound_model_not_selected(self):
+        """A RETIRED SOUND_CLASSIFICATION model must not be returned as active."""
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from ml_inference.services import InferenceService
+
+        self._make_model(
+            'routing-retired-sound-v1',
+            ModelTaskType.SOUND_CLASSIFICATION,
+            ModelStatus.RETIRED,
+        )
+        result = InferenceService.get_active_model()
+        self.assertIsNone(result, "RETIRED model must not be returned as active model.")
+
+    def test_development_sound_model_not_selected(self):
+        """A DEVELOPMENT model must not be served as active."""
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from ml_inference.services import InferenceService
+
+        self._make_model(
+            'routing-dev-sound-v1',
+            ModelTaskType.SOUND_CLASSIFICATION,
+            ModelStatus.DEVELOPMENT,
+        )
+        result = InferenceService.get_active_model()
+        self.assertIsNone(result, "DEVELOPMENT model must not be returned as active model.")
+
+    def test_active_model_endpoint_excludes_disease_model(self):
+        """
+        GET /api/v1/models/active/ must return the SOUND_CLASSIFICATION model,
+        not the disease model, when both are ACTIVE.
+        """
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from django.urls import reverse
+
+        sound_model = self._make_model(
+            'routing-endpoint-sound-v1',
+            ModelTaskType.SOUND_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+        )
+        self._make_model(
+            'routing-endpoint-disease-v1',
+            ModelTaskType.DISEASE_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+        )
+
+        client = APIClient()
+        url = reverse('model-active')
+        response = client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['task_type'], ModelTaskType.SOUND_CLASSIFICATION)
+        self.assertEqual(response.data['version'], sound_model.version)
+
+    def test_active_model_endpoint_returns_503_when_only_disease_active(self):
+        """
+        GET /api/v1/models/active/ must return 503 when no SOUND_CLASSIFICATION model is active.
+        It must not return the disease model as a sound model.
+        """
+        from ml_inference.models import ModelTaskType, ModelStatus
+        from django.urls import reverse
+
+        self._make_model(
+            'routing-only-disease-endpoint-v1',
+            ModelTaskType.DISEASE_CLASSIFICATION,
+            ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+        )
+
+        client = APIClient()
+        url = reverse('model-active')
+        response = client.get(url)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.data['code'], 'NO_ACTIVE_MODEL')
+
+
+class PredictionSerializerSafetyTests(TestCase):
+    """
+    Phase 4 — Verifies API response safety:
+    - research_disclaimer is always present on prediction responses.
+    - model_task_type is correctly included.
+    - Probabilities are valid (non-negative, 4 entries for the acoustic model).
+    - Predicted class is one of the verified classes.
+    - No clinical diagnosis language is embedded in the core serializer.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from recordings.models import Recording, RecordingStatus
+        from ml_inference.models import ModelVersion, ModelStatus, ModelTaskType, Prediction, PredictionStatus
+
+        self.user = User.objects.create_user(username='safety_tester', password='Password123!')
+        self.recording = Recording.objects.create(
+            original_filename='test_chest.wav',
+            file_format='wav',
+            file_size_bytes=16384,
+            duration_seconds=2.0,
+            sample_rate=8000,
+            channels=1,
+            recording_status=RecordingStatus.VALIDATED,
+            uploader=self.user,
+        )
+        self.model_version = ModelVersion.objects.create(
+            version='safety-test-sound-v1',
+            task_type=ModelTaskType.SOUND_CLASSIFICATION,
+            status=ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-cnn-v1-fold0.keras',
+            verified_classes=['Normal', 'CAS', 'DAS', 'CAS & DAS'],
+        )
+        self.prediction = Prediction.objects.create(
+            recording=self.recording,
+            model_version=self.model_version,
+            predicted_class='Normal',
+            probability_scores={'Normal': 0.5132, 'CAS': 0.1267, 'DAS': 0.2990, 'CAS & DAS': 0.0611},
+            prediction_status=PredictionStatus.SUCCESS,
+            inference_duration_ms=142,
+        )
+
+    def test_disclaimer_always_present(self):
+        """research_disclaimer must always be present in prediction response."""
+        from ml_inference.serializers import PredictionSerializer
+        data = PredictionSerializer(self.prediction).data
+        self.assertIn('research_disclaimer', data)
+        disclaimer = data['research_disclaimer']
+        self.assertIsInstance(disclaimer, str)
+        self.assertGreater(len(disclaimer), 10)
+
+    def test_disclaimer_contains_required_text(self):
+        """The disclaimer must contain the mandated 'not a medical diagnosis' statement."""
+        from ml_inference.serializers import PredictionSerializer
+        data = PredictionSerializer(self.prediction).data
+        disclaimer = data['research_disclaimer'].lower()
+        self.assertIn('not a medical diagnosis', disclaimer,
+                      "Mandatory disclaimer text 'not a medical diagnosis' missing from response.")
+        self.assertIn('experimental', disclaimer,
+                      "Disclaimer must state the model is experimental.")
+
+    def test_disclaimer_does_not_claim_clinical_accuracy(self):
+        """Disclaimer must not contain clinical accuracy claims."""
+        from ml_inference.serializers import PredictionSerializer
+        data = PredictionSerializer(self.prediction).data
+        disclaimer = data['research_disclaimer'].lower()
+        forbidden_phrases = ['clinically validated', 'fda approved', '100% accurate', 'confirms diagnosis']
+        for phrase in forbidden_phrases:
+            self.assertNotIn(phrase, disclaimer, f"Forbidden clinical claim found: '{phrase}'")
+
+    def test_model_task_type_in_response(self):
+        """model_task_type must be SOUND_CLASSIFICATION in prediction response."""
+        from ml_inference.serializers import PredictionSerializer
+        from ml_inference.models import ModelTaskType
+        data = PredictionSerializer(self.prediction).data
+        self.assertIn('model_task_type', data)
+        self.assertEqual(data['model_task_type'], ModelTaskType.SOUND_CLASSIFICATION)
+
+    def test_probabilities_are_valid(self):
+        """All probability scores must be non-negative and plausibly sum to ~1."""
+        from ml_inference.serializers import PredictionSerializer
+        data = PredictionSerializer(self.prediction).data
+        probs = data['probability_scores']
+        self.assertEqual(len(probs), 4, "Expected 4 classes in probability map.")
+        for cls, prob in probs.items():
+            self.assertGreaterEqual(prob, 0.0, f"Negative probability for class {cls!r}.")
+            self.assertLessEqual(prob, 1.0, f"Probability > 1.0 for class {cls!r}.")
+        total = sum(probs.values())
+        self.assertAlmostEqual(total, 1.0, delta=0.01, msg="Probabilities must sum to ~1.0.")
+
+    def test_predicted_class_is_valid_label(self):
+        """predicted_class must be one of the verified classes."""
+        from ml_inference.serializers import PredictionSerializer
+        data = PredictionSerializer(self.prediction).data
+        valid_classes = ['Normal', 'CAS', 'DAS', 'CAS & DAS']
+        self.assertIn(data['predicted_class'], valid_classes)
+
+    def test_failed_prediction_includes_error_details(self):
+        """A FAILED prediction must expose error_details, not hide it."""
+        from ml_inference.models import Prediction, PredictionStatus
+        from ml_inference.serializers import PredictionSerializer
+        failed_pred = Prediction.objects.create(
+            recording=self.recording,
+            model_version=self.model_version,
+            prediction_status=PredictionStatus.FAILED,
+            error_details='Inference error: audio file corrupted.',
+        )
+        data = PredictionSerializer(failed_pred).data
+        self.assertEqual(data['prediction_status'], PredictionStatus.FAILED)
+        self.assertIn('corrupted', data['error_details'])
+        # Disclaimer still present even on failure
+        self.assertIn('research_disclaimer', data)
+
+    def test_unavailable_prediction_has_empty_class_and_scores(self):
+        """An UNAVAILABLE prediction must not contain fabricated class or scores."""
+        from ml_inference.models import Prediction, PredictionStatus
+        from ml_inference.serializers import PredictionSerializer
+        unavailable_pred = Prediction.objects.create(
+            recording=self.recording,
+            prediction_status=PredictionStatus.UNAVAILABLE,
+            error_details='No model deployed.',
+        )
+        data = PredictionSerializer(unavailable_pred).data
+        self.assertEqual(data['prediction_status'], PredictionStatus.UNAVAILABLE)
+        self.assertEqual(data['predicted_class'], '')
+        self.assertEqual(data['probability_scores'], {})
+        self.assertIsNone(data['model_version'])
+
+
+class APIRoutingEndpointTests(TestCase):
+    """
+    Phase 3 — API-level integration tests (mocked).
+    Tests authenticated and unauthenticated access patterns,
+    routing correctness, and response shape.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from recordings.models import Recording, RecordingStatus
+
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='api_tester', password='Password123!')
+        self.other_user = User.objects.create_user(username='other_user', password='Password123!')
+        self.recording = Recording.objects.create(
+            original_filename='breath.wav',
+            file_format='wav',
+            file_size_bytes=8192,
+            duration_seconds=1.5,
+            sample_rate=8000,
+            channels=1,
+            recording_status=RecordingStatus.VALIDATED,
+            uploader=self.user,
+        )
+
+    def test_predict_requires_authentication(self):
+        """Unauthenticated POST to /predict/ must return 401."""
+        from django.urls import reverse
+        url = reverse('recording-predict', kwargs={'recording_id': self.recording.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_predict_forbidden_for_non_owner(self):
+        """A different user (non-owner, non-clinician) must receive 403."""
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.other_user)
+        url = reverse('recording-predict', kwargs={'recording_id': self.recording.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_predict_returns_503_no_sound_model(self):
+        """With no active SOUND_CLASSIFICATION model, /predict/ must return 503."""
+        from django.urls import reverse
+        from ml_inference.models import ModelTaskType, ModelStatus, ModelVersion
+
+        # Only a disease model is active — acoustic endpoint must still return 503
+        ModelVersion.objects.create(
+            version='api-test-disease-only-v1',
+            task_type=ModelTaskType.DISEASE_CLASSIFICATION,
+            status=ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-disease-cnn-v2.keras',
+            verified_classes=['Healthy Control', 'Pneumonia', 'Wheezing Disorders'],
+        )
+
+        self.client.force_authenticate(user=self.user)
+        url = reverse('recording-predict', kwargs={'recording_id': self.recording.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.data['code'], 'MODEL_NOT_DEPLOYED')
+        # Verify UNAVAILABLE record persisted
+        from ml_inference.models import Prediction, PredictionStatus
+        pred = Prediction.objects.filter(recording=self.recording).first()
+        self.assertIsNotNone(pred)
+        self.assertEqual(pred.prediction_status, PredictionStatus.UNAVAILABLE)
+
+    def test_model_list_accessible_unauthenticated(self):
+        """GET /models/ must be publicly accessible (IsAuthenticatedOrReadOnly)."""
+        from django.urls import reverse
+        url = reverse('model-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_model_list_includes_task_type(self):
+        """Model list response must include task_type for each model."""
+        from django.urls import reverse
+        from ml_inference.models import ModelVersion, ModelTaskType, ModelStatus
+        ModelVersion.objects.create(
+            version='api-list-test-v1',
+            task_type=ModelTaskType.SOUND_CLASSIFICATION,
+            status=ModelStatus.DEVELOPMENT,
+            verified_classes=['Normal', 'CAS', 'DAS', 'CAS & DAS'],
+        )
+        url = reverse('model-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.data) >= 1)
+        for model_data in response.data:
+            self.assertIn('task_type', model_data)
+            self.assertIn('task_type_display', model_data)
+
+    def test_prediction_list_requires_authentication(self):
+        """GET /predictions/ must require authentication."""
+        from django.urls import reverse
+        url = reverse('prediction-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_prediction_list_returns_200_for_authenticated(self):
+        """GET /predictions/ returns 200 for authenticated user."""
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.user)
+        url = reverse('prediction-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_prediction_history_for_recording_requires_auth(self):
+        """GET /recordings/<id>/predictions/ must require authentication."""
+        from django.urls import reverse
+        url = reverse('recording-prediction-history', kwargs={'recording_id': self.recording.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_prediction_response_includes_disclaimer(self):
+        """
+        Predictions returned from the history endpoint must include research_disclaimer.
+        (mocked — does not invoke the real CNN)
+        """
+        from django.urls import reverse
+        from ml_inference.models import Prediction, PredictionStatus, ModelVersion, ModelStatus, ModelTaskType
+
+        mv = ModelVersion.objects.create(
+            version='api-disclaimer-test-v1',
+            task_type=ModelTaskType.SOUND_CLASSIFICATION,
+            status=ModelStatus.DEVELOPMENT,
+            verified_classes=['Normal', 'CAS', 'DAS', 'CAS & DAS'],
+        )
+        Prediction.objects.create(
+            recording=self.recording,
+            model_version=mv,
+            predicted_class='Normal',
+            probability_scores={'Normal': 0.75, 'CAS': 0.1, 'DAS': 0.1, 'CAS & DAS': 0.05},
+            prediction_status=PredictionStatus.SUCCESS,
+            inference_duration_ms=100,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        url = reverse('recording-prediction-history', kwargs={'recording_id': self.recording.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        pred_data = response.data[0]
+        self.assertIn('research_disclaimer', pred_data)
+        self.assertIn('not a medical diagnosis', pred_data['research_disclaimer'].lower())
+
+    def test_disease_model_active_endpoint_separate_from_sound(self):
+        """
+        GET /models/disease/active/ must be completely separate from /models/active/.
+        One returning 503 must not affect the other.
+        """
+        from django.urls import reverse
+        from ml_inference.models import ModelVersion, ModelTaskType, ModelStatus
+
+        # Only a sound model is active
+        ModelVersion.objects.create(
+            version='api-sep-sound-v1',
+            task_type=ModelTaskType.SOUND_CLASSIFICATION,
+            status=ModelStatus.ACTIVE,
+            artifact_path='ml/models/saved_models/sprsound-cnn-v1-fold0.keras',
+            verified_classes=['Normal', 'CAS', 'DAS', 'CAS & DAS'],
+        )
+
+        # Sound model endpoint → 200
+        sound_response = self.client.get(reverse('model-active'))
+        self.assertEqual(sound_response.status_code, 200)
+        self.assertEqual(sound_response.data['task_type'], ModelTaskType.SOUND_CLASSIFICATION)
+
+        # Disease model endpoint → 503 (no disease model deployed)
+        disease_response = self.client.get(reverse('disease-model-active'))
+        self.assertEqual(disease_response.status_code, 503)
+        self.assertEqual(disease_response.data['code'], 'NO_ACTIVE_DISEASE_MODEL')
+
+    def test_nonexistent_recording_predict_returns_404(self):
+        """POST to /predict/ with invalid recording UUID must return 404."""
+        import uuid
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.user)
+        fake_id = uuid.uuid4()
+        url = reverse('recording-predict', kwargs={'recording_id': fake_id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_repeated_predict_requests_persist_separate_records(self):
+        """
+        Multiple POST calls to /predict/ for the same recording each create
+        a separate Prediction record (audit trail preserved).
+        """
+        from django.urls import reverse
+        from ml_inference.models import Prediction
+        self.client.force_authenticate(user=self.user)
+        url = reverse('recording-predict', kwargs={'recording_id': self.recording.id})
+        # Both calls return 503 (no model) but each creates its own record
+        self.client.post(url)
+        self.client.post(url)
+        pred_count = Prediction.objects.filter(recording=self.recording).count()
+        self.assertEqual(pred_count, 2, "Each inference request must persist its own Prediction record.")

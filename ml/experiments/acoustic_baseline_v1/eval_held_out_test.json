@@ -1,0 +1,59 @@
+{
+  "total_samples": 347,
+  "accuracy": 0.585,
+  "balanced_accuracy": 0.3712,
+  "macro_f1": 0.3018,
+  "weighted_f1": 0.5808,
+  "confusion_matrix": [
+    [
+      187,
+      0,
+      49,
+      5
+    ],
+    [
+      31,
+      1,
+      22,
+      11
+    ],
+    [
+      7,
+      1,
+      11,
+      5
+    ],
+    [
+      4,
+      0,
+      9,
+      4
+    ]
+  ],
+  "per_class_metrics": {
+    "Normal": {
+      "precision": 0.8166,
+      "recall": 0.7759,
+      "f1_score": 0.7957,
+      "support": 241
+    },
+    "CAS": {
+      "precision": 0.5,
+      "recall": 0.0154,
+      "f1_score": 0.0299,
+      "support": 65
+    },
+    "DAS": {
+      "precision": 0.1209,
+      "recall": 0.4583,
+      "f1_score": 0.1913,
+      "support": 24
+    },
+    "CAS & DAS": {
+      "precision": 0.16,
+      "recall": 0.2353,
+      "f1_score": 0.1905,
+      "support": 17
+    }
+  }
+}

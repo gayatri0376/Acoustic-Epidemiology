@@ -1,0 +1,4 @@
+Actual/Predicted,Healthy Control,Pneumonia,Wheezing Disorders
+Healthy Control,24,9,0
+Pneumonia,115,132,0
+Wheezing Disorders,52,25,0

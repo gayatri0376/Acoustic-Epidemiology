@@ -1,0 +1,28 @@
+{
+  "experiment_id": "SLIDING_WINDOW_INFERENCE_V1",
+  "task": "FULL_RECORDING_RESPIRATORY_SOUND_ANALYSIS",
+  "baseline_model_artifact": "ml/experiments/acoustic_baseline_v1/sprsound_sound_cnn_baseline_fold0.keras",
+  "input_spectrogram_shape": [
+    128,
+    "T"
+  ],
+  "window_parameters": {
+    "window_size_frames": 128,
+    "window_duration_seconds": 8.192,
+    "stride_frames": 64,
+    "stride_seconds": 4.096,
+    "overlap_percentage": 50.0
+  },
+  "selected_aggregation_strategy": "abnormality_max",
+  "aggregation_selection_criterion": "Validation Fold 0 Balanced Accuracy",
+  "classes": [
+    "Normal",
+    "CAS",
+    "DAS",
+    "CAS & DAS"
+  ],
+  "benchmarks": {
+    "val_fold0_samples": 354,
+    "held_out_test_samples": 347
+  }
+}

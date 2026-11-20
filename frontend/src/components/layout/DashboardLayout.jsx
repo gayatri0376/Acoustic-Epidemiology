@@ -23,8 +23,8 @@ export default function DashboardLayout({ navItems, children }) {
       <div className="shell">
         <aside className={`sidebar ${open ? 'open' : ''}`} aria-label="Sidebar">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Logo light />
-            <button className="toggle menu-btn" style={{ position: 'static', color: '#fff' }} onClick={() => setOpen(false)} aria-label="Close menu"><X size={20} /></button>
+            <Logo />
+            <button className="toggle menu-btn" style={{ position: 'static', color: 'var(--text-primary)' }} onClick={() => setOpen(false)} aria-label="Close menu"><X size={20} /></button>
           </div>
           <nav className="nav" aria-label="Dashboard sections">
             {navItems.map(({ id, label, icon: Icon }) => (

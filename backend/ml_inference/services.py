@@ -6,7 +6,7 @@ import numpy as np
 from django.conf import settings
 from rest_framework.exceptions import APIException
 from rest_framework import status
-from ml_inference.models import ModelVersion, ModelStatus, Prediction, PredictionStatus
+from ml_inference.models import ModelVersion, ModelStatus, ModelTaskType, Prediction, PredictionStatus
 from ml_inference.disease_service import DiseaseInferenceService
 
 logger = logging.getLogger(__name__)
@@ -309,12 +309,20 @@ class InferenceService:
     @staticmethod
     def get_active_model():
         """
-        Retrieves the active model version if and only if:
-        1. It is marked ACTIVE in the database
-        2. Its artifact physically exists on disk
-        3. It defines non-empty verified_classes
+        Retrieves the active SOUND_CLASSIFICATION model version if and only if:
+        1. task_type == SOUND_CLASSIFICATION  (guards against disease model selection)
+        2. It is marked ACTIVE in the database
+        3. Its artifact physically exists on disk
+        4. It defines non-empty verified_classes
+
+        task_type filtering is mandatory: without it, DB ordering by -created_at could
+        cause a DISEASE_CLASSIFICATION model to be returned here when both models share
+        ACTIVE status (ISSUE-3 fix, 2026-11-20).
         """
-        active_models = ModelVersion.objects.filter(status=ModelStatus.ACTIVE)
+        active_models = ModelVersion.objects.filter(
+            status=ModelStatus.ACTIVE,
+            task_type=ModelTaskType.SOUND_CLASSIFICATION,
+        )
         for model in active_models:
             if model.is_artifact_available() and model.verified_classes:
                 return model

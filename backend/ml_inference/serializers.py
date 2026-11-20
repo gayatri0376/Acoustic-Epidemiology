@@ -28,11 +28,23 @@ class ModelVersionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'is_available', 'status_display', 'task_type_display', 'created_at', 'updated_at']
 
 
+SOUND_CLASSIFICATION_DISCLAIMER = (
+    "Experimental respiratory sound classification. "
+    "This result is not a medical diagnosis. "
+    "The model classifies acoustic patterns into Normal, CAS (wheeze), DAS (crackle), "
+    "or CAS & DAS categories based on the SPRSound pediatric dataset. "
+    "CAS detection performance is severely limited (recall ~0–1.5%). "
+    "Results must not be used for clinical decision-making."
+)
+
+
 class PredictionSerializer(serializers.ModelSerializer):
     recording_id = serializers.UUIDField(source='recording.id', read_only=True)
     recording_filename = serializers.CharField(source='recording.original_filename', read_only=True)
     model_version_str = serializers.CharField(source='model_version.version', read_only=True, default=None)
+    model_task_type = serializers.CharField(source='model_version.task_type', read_only=True, default=None)
     status_display = serializers.CharField(source='get_prediction_status_display', read_only=True)
+    research_disclaimer = serializers.SerializerMethodField()
 
     class Meta:
         model = Prediction
@@ -42,12 +54,14 @@ class PredictionSerializer(serializers.ModelSerializer):
             'recording_filename',
             'model_version',
             'model_version_str',
+            'model_task_type',
             'predicted_class',
             'probability_scores',
             'prediction_status',
             'status_display',
             'error_details',
             'inference_duration_ms',
+            'research_disclaimer',
             'created_at',
         ]
         read_only_fields = [
@@ -56,14 +70,20 @@ class PredictionSerializer(serializers.ModelSerializer):
             'recording_filename',
             'model_version',
             'model_version_str',
+            'model_task_type',
             'predicted_class',
             'probability_scores',
             'prediction_status',
             'status_display',
             'error_details',
             'inference_duration_ms',
+            'research_disclaimer',
             'created_at',
         ]
+
+    def get_research_disclaimer(self, obj):
+        """Always returns the mandatory research safety disclaimer for sound classification."""
+        return SOUND_CLASSIFICATION_DISCLAIMER
 
 
 class DiseasePredictionSerializer(serializers.ModelSerializer):

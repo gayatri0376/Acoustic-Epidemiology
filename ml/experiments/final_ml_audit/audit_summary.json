@@ -1,0 +1,70 @@
+{
+  "audit_name": "FINAL_ML_RESEARCH_AUDIT",
+  "date": "2026-11-20",
+  "auditors": {
+    "ml_lead": "Mohini (Machine Learning Modeling & CNN Lead)",
+    "integration_lead": "Gayatri (Senior ML Integration Lead)"
+  },
+  "dataset_verification": {
+    "total_manifest_records": 2683,
+    "patient_disjointness_verified": true,
+    "train_cv_patients": 251,
+    "held_out_inter_test_patients": 41,
+    "train_vs_test_patient_overlap": 0,
+    "train_cv_fold0_vs_folds1_4_patient_overlap": 0
+  },
+  "ml_baseline_verified_metrics": {
+    "acoustic_baseline_v1": {
+      "val_fold0": {
+        "accuracy": 0.7429,
+        "balanced_accuracy": 0.3346,
+        "macro_f1": 0.3284,
+        "recalls": {
+          "Normal": 0.9387,
+          "CAS": 0.0,
+          "DAS": 0.3469,
+          "CAS & DAS": 0.0526
+        }
+      },
+      "held_out_inter_test": {
+        "accuracy": 0.585,
+        "balanced_accuracy": 0.3712,
+        "macro_f1": 0.3018,
+        "recalls": {
+          "Normal": 0.7759,
+          "CAS": 0.0154,
+          "DAS": 0.4583,
+          "CAS & DAS": 0.2353
+        }
+      }
+    },
+    "sliding_window_v1_locked": {
+      "config": "stride_64_abnormality_max",
+      "val_fold0": {
+        "accuracy": 0.7429,
+        "balanced_accuracy": 0.3429,
+        "macro_f1": 0.3342,
+        "recalls": {
+          "Normal": 0.931,
+          "CAS": 0.0,
+          "DAS": 0.3878,
+          "CAS & DAS": 0.0526
+        }
+      },
+      "held_out_inter_test": {
+        "accuracy": 0.5562,
+        "balanced_accuracy": 0.3401,
+        "macro_f1": 0.2666,
+        "recalls": {
+          "Normal": 0.7427,
+          "CAS": 0.0,
+          "DAS": 0.5,
+          "CAS & DAS": 0.1176
+        }
+      }
+    }
+  },
+  "model_readiness_category": "EXPERIMENTAL_RESEARCH_BASELINE",
+  "backend_deployment_status": "STRICTLY_BLOCKED",
+  "final_ml_decision": "FREEZE_ML_EXPERIMENTATION_AND_PROCEED_TO_PAPER_WRITING"
+}

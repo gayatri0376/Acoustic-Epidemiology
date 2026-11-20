@@ -1,0 +1,65 @@
+[
+  {
+    "claim_id": "RC-1",
+    "topic": "Wheezing Detection (CAS)",
+    "claim_text": "The 2D-CNN accurately detects wheezing and continuous adventitious sounds in pediatric auscultation.",
+    "status": "UNSUPPORTED_AND_MUST_BE_REMOVED",
+    "evidence": "CAS recall is 0.00% on validation data (0/25) and only 1.54% (1/65) on center-crop test data, falling to 0.00% (0/65) across all sliding-window configurations. Claiming accurate wheezing detection is mathematically false and dangerous."
+  },
+  {
+    "claim_id": "RC-2",
+    "topic": "Crackle Detection (DAS)",
+    "claim_text": "Convolutional feature extraction with Dual Pooling provides measurable sensitivity to discontinuous adventitious sounds (crackles).",
+    "status": "VERIFIED_BY_EXPERIMENTAL_EVIDENCE",
+    "evidence": "DAS crackle recall reached 34.69% on validation fold 0, 45.83% on center-crop test set, and improved to 50.00% (S=64) and 54.17% (S=32) under sliding-window abnormality-max aggregation. Dual pooling (combining max-pooling and average-pooling) captures sharp impulsive crackle transients."
+  },
+  {
+    "claim_id": "RC-3",
+    "topic": "Sliding-Window Improvement",
+    "claim_text": "Sliding-window inference resolves the temporal clipping problem of fixed center-cropping for full recordings.",
+    "status": "SUPPORTED_BUT_REQUIRES_CAUTIOUS_INTERPRETATION",
+    "evidence": "Sliding-window inference provides 100% temporal coverage without zero-padding distortion and boosts crackle detection from 45.83% to 50.00%. However, it does NOT resolve the wheezing deficit (CAS recall remains 0.00%) and reduces overall balanced accuracy on the test set from 37.12% to 34.01% because the underlying CNN was never trained with multi-window augmentation."
+  },
+  {
+    "claim_id": "RC-4",
+    "topic": "Full-Recording Analysis",
+    "claim_text": "The sliding-window framework enables end-to-end full recording analysis within real-time latency budgets.",
+    "status": "VERIFIED_BY_EXPERIMENTAL_EVIDENCE",
+    "evidence": "Sliding-window inference evaluated recordings averaging 2.20 windows in 3.6 ms/sample in batch mode, and ~12 ms in online single-sample execution, well within web and stethoscopic application limits (<50 ms)."
+  },
+  {
+    "claim_id": "RC-5",
+    "topic": "Patient-Independent Generalization",
+    "claim_text": "The evaluation guarantees strict patient-level separation with zero subject leakage.",
+    "status": "VERIFIED_BY_EXPERIMENTAL_EVIDENCE",
+    "evidence": "Auditing all 2,056 SPRSound records confirmed 0 overlapping patients between train_cv (194 patients) and held_out_inter_test (41 patients), and 0 overlapping patients between CV training folds 1-4 and validation fold 0 (49 patients)."
+  },
+  {
+    "claim_id": "RC-6",
+    "topic": "CNN Effectiveness for Pediatric Diagnosis",
+    "claim_text": "The current CNN is ready for automated diagnosis of pediatric respiratory diseases.",
+    "status": "UNSUPPORTED_AND_MUST_BE_REMOVED",
+    "evidence": "The disease model failed completely (Exp 1 predicted 100% Pneumonia, Exp 4 achieved 42.06% Balanced Accuracy with 0% Wheezing recall). Furthermore, clinical disease diagnoses are patient-level, not localized to acoustic recordings. Deploying this model for diagnosis would cause catastrophic clinical misdiagnosis."
+  },
+  {
+    "claim_id": "RC-7",
+    "topic": "Transfer Learning Feasibility",
+    "claim_text": "Transfer learning from adult respiratory datasets (e.g. ICBHI 2017) can be directly applied to pediatric stethoscopy.",
+    "status": "HYPOTHESIS_REQUIRING_FURTHER_EXPERIMENTATION",
+    "evidence": "Adult breathing rates, chest wall dimensions, and acoustic resonances differ substantially from pediatric acoustics. Additionally, ICBHI is annotated at the breath-cycle level (~2.7s), whereas SPRSound is annotated at the recording level (~10.8s), creating structural scale mismatch."
+  },
+  {
+    "claim_id": "RC-8",
+    "topic": "Grad-CAM Explainability",
+    "claim_text": "Grad-CAM produces clinically verified, faithful heatmaps of adventitious acoustic events on Mel-spectrograms.",
+    "status": "SUPPORTED_BUT_REQUIRES_CAUTIOUS_INTERPRETATION",
+    "evidence": "The model has an explicitly named target layer 'last_conv_layer' and generates valid gradient maps. However, because CAS representations are unlearned, Grad-CAM on CAS samples highlights background resonance rather than true wheeze harmonics. Only DAS crackle heatmaps show localized spectro-temporal correspondence."
+  },
+  {
+    "claim_id": "RC-9",
+    "topic": "Clinical Applicability & Deployment Readiness",
+    "claim_text": "The acoustic model is suitable for backend integration and clinical decision support.",
+    "status": "UNSUPPORTED_AND_MUST_BE_REMOVED",
+    "evidence": "With Balanced Accuracy at 37.12% (center-crop) and 34.01% (sliding window), the model is an experimental research baseline only. It must NEVER be activated in Django or deployed for clinical use."
+  }
+]

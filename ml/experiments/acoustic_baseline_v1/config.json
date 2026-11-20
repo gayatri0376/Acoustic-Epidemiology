@@ -1,0 +1,91 @@
+{
+  "experiment_id": "ACOUSTIC_BASELINE_V1",
+  "task": "SPRSOUND_RECORD_4CLASS",
+  "model_name": "PediatricAcousticBaselineCNN",
+  "artifact_path": "ml/experiments/acoustic_baseline_v1/sprsound_sound_cnn_baseline_fold0.keras",
+  "classes": [
+    "Normal",
+    "CAS",
+    "DAS",
+    "CAS & DAS"
+  ],
+  "input_shape": [
+    128,
+    128,
+    1
+  ],
+  "architecture": {
+    "blocks": 4,
+    "filters": [
+      32,
+      64,
+      128,
+      256
+    ],
+    "pooling": "DualPooling (GAP + GMP)",
+    "target_conv_layer": "last_conv_layer",
+    "dense_units": 128,
+    "dropout": [
+      0.2,
+      0.2,
+      0.25,
+      0.3
+    ],
+    "l2_reg": 0.0001
+  },
+  "training_parameters": {
+    "val_fold": 0,
+    "epochs": 25,
+    "selected_epoch": 23,
+    "batch_size": 32,
+    "optimizer": "Adam",
+    "initial_learning_rate": 0.0003,
+    "loss": "sparse_categorical_crossentropy",
+    "class_weights": {
+      "0 (Normal)": 0.5031,
+      "1 (CAS)": 1.6986,
+      "2 (DAS)": 1.1495,
+      "3 (CAS & DAS)": 1.8059
+    },
+    "augmentation": {
+      "CAS": "SpecAugment 3x",
+      "DAS": "SpecAugment 2x",
+      "CAS & DAS": "SpecAugment 4x",
+      "Normal": "SpecAugment 0.3x"
+    },
+    "checkpoint_metric": "Balanced Accuracy (mean recall across all 4 classes)"
+  },
+  "dataset_splits": {
+    "train_cv_unaugmented": {
+      "Normal": 1042,
+      "CAS": 101,
+      "DAS": 199,
+      "CAS & DAS": 76,
+      "total": 1418,
+      "patients": 194
+    },
+    "train_cv_augmented": {
+      "Normal": 1364,
+      "CAS": 404,
+      "DAS": 597,
+      "CAS & DAS": 380,
+      "total": 2745
+    },
+    "val_fold0": {
+      "Normal": 261,
+      "CAS": 25,
+      "DAS": 49,
+      "CAS & DAS": 19,
+      "total": 354,
+      "patients": 49
+    },
+    "held_out_inter_test": {
+      "Normal": 241,
+      "CAS": 65,
+      "DAS": 24,
+      "CAS & DAS": 17,
+      "total": 347,
+      "patients": 41
+    }
+  }
+}

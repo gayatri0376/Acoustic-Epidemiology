@@ -1,0 +1,60 @@
+{
+  "total_samples": 354,
+  "unique_patients": 49,
+  "accuracy": 0.7373,
+  "balanced_accuracy": 0.25,
+  "macro_f1": 0.2122,
+  "weighted_f1": 0.6258,
+  "confusion_matrix": [
+    [
+      261,
+      0,
+      0,
+      0
+    ],
+    [
+      25,
+      0,
+      0,
+      0
+    ],
+    [
+      49,
+      0,
+      0,
+      0
+    ],
+    [
+      19,
+      0,
+      0,
+      0
+    ]
+  ],
+  "per_class_metrics": {
+    "Normal": {
+      "precision": 0.7373,
+      "recall": 1.0,
+      "f1_score": 0.8488,
+      "support": 261
+    },
+    "CAS": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 25
+    },
+    "DAS": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 49
+    },
+    "CAS & DAS": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "support": 19
+    }
+  }
+}

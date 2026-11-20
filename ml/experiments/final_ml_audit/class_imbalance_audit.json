@@ -1,0 +1,110 @@
+{
+  "full_dataset_raw": {
+    "counts": {
+      "Poor Quality": 187,
+      "Normal": 1785,
+      "DAS": 347,
+      "CAS & DAS": 131,
+      "CAS": 233
+    },
+    "percentages": {
+      "Poor Quality": 6.97,
+      "Normal": 66.53,
+      "DAS": 12.93,
+      "CAS & DAS": 4.88,
+      "CAS": 8.68
+    },
+    "total": 2683
+  },
+  "train_cv_raw": {
+    "counts": {
+      "Poor Quality": 177,
+      "Normal": 1303,
+      "DAS": 248,
+      "CAS & DAS": 95,
+      "CAS": 126
+    },
+    "percentages": {
+      "Poor Quality": 9.08,
+      "Normal": 66.85,
+      "DAS": 12.72,
+      "CAS & DAS": 4.87,
+      "CAS": 6.46
+    },
+    "total": 1949
+  },
+  "train_cv_unaugmented_folds1_4": {
+    "counts": {
+      "Normal": 1042,
+      "DAS": 199,
+      "CAS & DAS": 76,
+      "CAS": 101
+    },
+    "percentages": {
+      "Normal": 73.48,
+      "DAS": 14.03,
+      "CAS & DAS": 5.36,
+      "CAS": 7.12
+    },
+    "total": 1418
+  },
+  "val_fold0_4class": {
+    "counts": {
+      "Normal": 261,
+      "DAS": 49,
+      "CAS & DAS": 19,
+      "CAS": 25
+    },
+    "percentages": {
+      "Normal": 73.73,
+      "DAS": 13.84,
+      "CAS & DAS": 5.37,
+      "CAS": 7.06
+    },
+    "total": 354
+  },
+  "held_out_inter_test_4class": {
+    "counts": {
+      "Normal": 241,
+      "CAS": 65,
+      "CAS & DAS": 17,
+      "DAS": 24
+    },
+    "percentages": {
+      "Normal": 69.45,
+      "CAS": 18.73,
+      "CAS & DAS": 4.9,
+      "DAS": 6.92
+    },
+    "total": 347
+  },
+  "intra_subject_test_raw": {
+    "counts": {
+      "DAS": 75,
+      "CAS & DAS": 19,
+      "Normal": 241,
+      "CAS": 42,
+      "Poor Quality": 2
+    },
+    "percentages": {
+      "DAS": 19.79,
+      "CAS & DAS": 5.01,
+      "Normal": 63.59,
+      "CAS": 11.08,
+      "Poor Quality": 0.53
+    },
+    "total": 379
+  },
+  "test_2023_raw": {
+    "counts": {},
+    "percentages": {},
+    "total": 0
+  },
+  "imbalance_ratios_train_unaugmented": {
+    "Normal_to_CAS": 10.32,
+    "Normal_to_DAS": 5.24,
+    "Normal_to_CAS_and_DAS": 13.71,
+    "Minority_Adventitious_Total": 376,
+    "Minority_Percentage_In_Train": 26.52
+  }
+}
